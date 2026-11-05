@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V2)
+-- cobble hills logic (ENTRENCHED PRO V3)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players = game:GetService("Players")
@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -66,18 +67,6 @@ task.spawn(function()
         end
     end
 end)
-
--- NO SPREAD (Hook no Raycast para a bala ir reta)
-local oldRaycast = workspace.Raycast
-workspace.Raycast = function(self, origin, direction, params)
-    if Config.Util.NoSpread and LocalPlayer.Character then
-        -- Pega a direção exata da câmera (ignora o offset de spread do jogo)
-        local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-        -- Mantém a magnitude original da direção para não bugar a física
-        direction = unitRay.Direction * direction.Magnitude
-    end
-    return oldRaycast(self, origin, direction, params)
-end
 
 -- ESP
 local function UpdateESP()
@@ -187,8 +176,7 @@ local function GetClosestPlayer(fovOverride)
                 local params = RaycastParams.new()
                 params.FilterType = Enum.RaycastFilterType.Exclude
                 params.FilterDescendantsInstances = { LocalPlayer.Character, char }
-                -- Usa o oldRaycast para não bugar com o NoSpread
-                if oldRaycast(Workspace, camPos, part.Position - camPos, params) then continue end
+                if Workspace:Raycast(camPos, part.Position - camPos, params) then continue end
             end
 
             local sp = Camera:WorldToViewportPoint(part.Position)
@@ -202,6 +190,20 @@ local function GetClosestPlayer(fovOverride)
     end
     return best
 end
+
+-- Hook para No Spread (Hook no ScreenPointToRay)
+local oldRay
+pcall(function()
+    oldRay = Camera.ScreenPointToRay
+    Camera.ScreenPointToRay = function(self, x, y, depth)
+        if Config.Util.NoSpread then
+            -- Força a bala a sair do centro exato da tela
+            local vp = self.ViewportSize
+            return oldRay(self, vp.X / 2, vp.Y / 2, depth)
+        end
+        return oldRay(self, x, y, depth)
+    end
+end)
 
 -- Silent Aim Hook
 local oldIndex
@@ -238,22 +240,17 @@ RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100,
     end
 end)
 
--- TRIGGERBOT CORRIGIDO (Usa mouse1press/mouse1release)
+-- TRIGGERBOT REAL (VirtualUser)
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
         
-        -- Só atira se estiver segurando o botão esquerdo
         if UserInputService:IsMouseButtonPressed(Config.Triggerbot.Key) then
-            -- FOV bem pequeno (15 pixels) para disparar só quando estiver em cima
             local target = GetClosestPlayer(Config.Triggerbot.FOV)
             if target then
                 pcall(function()
-                    if mouse1press and mouse1release then
-                        mouse1press()
-                        task.wait(0.01)
-                        mouse1release()
-                    end
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton1(Vector2.new(0, 0))
                 end)
             end
         end
@@ -292,7 +289,7 @@ getgenv().Cobble_Unload = function()
         mt.__index = oldIndex
         setreadonly(mt, true)
     end)
-    pcall(function() workspace.Raycast = oldRaycast end) -- Restaura a física normal
+    pcall(function() if oldRay then Camera.ScreenPointToRay = oldRay end end)
     Lighting.Ambient = Color3.fromRGB(70, 70, 70)
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     Lighting.Brightness = 1
