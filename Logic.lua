@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED V12 - ANTI JAM)
+-- cobble hills logic (ENTRENCHED V13 - STABLE)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players          = game:GetService("Players")
@@ -14,29 +14,56 @@ local LocalPlayer = Players.LocalPlayer
 local Camera      = Workspace.CurrentCamera
 local Mouse       = LocalPlayer:GetMouse()
 
-getgenv().Cobble = {
-    Config = {
-        ESP = { Enabled = true, Box = true, Chams = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
-        Aimbot = { Enabled = true, Silent = true, TargetPart = "Head" },
-        Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
-        Util = { Fullbright = false, NoSpread = true, NoRecoil = true, FOVChanger = false, FOVValue = 90, Crosshair = true, InfAmmo = true }
-    },
-    Cache = {},
-    ESPObjects = {},
-    ChamsObjects = {},
-    Target = nil,
-    Ballistic = { Speed = 1000, Gravity = Workspace.Gravity }
+getgenv().CobbleConfig = {
+    ESP = { Enabled = true, Box = true, Chams = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
+    Aimbot = { Enabled = true, Silent = true, TargetPart = "Head", FOV = 250 },
+    Triggerbot = { Enabled = false, Delay = 0.02, FOV = 15 },
+    Util = { Fullbright = false, NoSpread = true, NoRecoil = true, FOVChanger = false, FOVValue = 90, Crosshair = true }
 }
 
-local Config = getgenv().Cobble.Config
+local Config = getgenv().CobbleConfig
 
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 1.5; fovCircle.NumSides = 60; fovCircle.Color = Color3.fromRGB(90, 140, 255)
+-- ==========================================================
+-- 1. DESATIVANDO O CAMERA SHAKER (Fim do bug da câmera)
+-- ==========================================================
+local cameraShaker = ReplicatedStorage:FindFirstChild("CameraShaker")
+if cameraShaker then
+    cameraShaker:Destroy() -- Remove o tremor de câmera do jogo
+end
 
-local crosshair = Drawing.new("Circle")
-crosshair.Thickness = 1; crosshair.NumSides = 4; crosshair.Filled = true; crosshair.Color = Color3.fromRGB(0, 255, 0)
+-- ==========================================================
+-- 2. GUN MODS SEGUROS (Apenas Spread e Recoil)
+-- ==========================================================
+task.spawn(function()
+    while task.wait(1) do -- Roda 1x por segundo para não quebrar a arma
+        local containers = {LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")}
+        for _, container in pairs(containers) do
+            if container then
+                for _, tool in ipairs(container:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local gunStates = tool:FindFirstChild("GunStates")
+                        if gunStates then
+                            pcall(function()
+                                local states = require(gunStates)
+                                if Config.Util.NoSpread then
+                                    states.Spread = 0; states.MinSpread = 0; states.MaxSpread = 0; states.SpreadIncrease = 0
+                                end
+                                if Config.Util.NoRecoil then
+                                    states.Recoil = 0; states.MinRecoil = 0; states.MaxRecoil = 0; states.CameraRecoil = 0
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
--- CACHE DE JOGADORES
+-- ==========================================================
+-- 3. CACHE E ESP
+-- ==========================================================
+local CachedPlayers = {}
 task.spawn(function()
     while task.wait(0.2) do
         local temp = {}
@@ -49,52 +76,10 @@ task.spawn(function()
                 end
             end
         end
-        getgenv().Cobble.Cache = temp
+        CachedPlayers = temp
     end
 end)
 
--- ============================================================
--- GUN MODS SEGUROS (No Spread, No Recoil, Inf Ammo)
--- ============================================================
-task.spawn(function()
-    while task.wait(0.1) do -- 10x por segundo é o suficiente e não trava
-        local containers = {LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")}
-        for _, container in pairs(containers) do
-            if container then
-                for _, tool in ipairs(container:GetChildren()) do
-                    if tool:IsA("Tool") then
-                        local gunStates = tool:FindFirstChild("GunStates")
-                        if gunStates then
-                            pcall(function()
-                                local states = require(gunStates)
-                                
-                                -- No Spread / Recoil
-                                if Config.Util.NoSpread then
-                                    states.Spread = 0; states.MinSpread = 0; states.MaxSpread = 0; states.SpreadIncrease = 0
-                                end
-                                if Config.Util.NoRecoil then
-                                    states.Recoil = 0; states.MinRecoil = 0; states.MaxRecoil = 0; states.CameraRecoil = 0
-                                end
-                                
-                                -- Infinite Ammo Seguro (Não trava a arma)
-                                if Config.Util.InfAmmo then
-                                    if states.Clip then states.Clip = 999 end
-                                    if states.Ammo then states.Ammo = 999 end
-                                    if states.MaxAmmo then states.MaxAmmo = 999 end
-                                    if states.ClipSize then states.ClipSize = 999 end
-                                    -- Recarga Instantânea
-                                    if states.ReloadTime then states.ReloadTime = 0 end
-                                end
-                            end)
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ESP E CHAMS
 local espObjects, chamsObjects = {}, {}
 local function UpdateESP()
     if not Config.ESP.Enabled then
@@ -102,7 +87,7 @@ local function UpdateESP()
         return
     end
     local active = {}
-    for char, data in pairs(getgenv().Cobble.Cache) do
+    for char, data in pairs(CachedPlayers) do
         if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
         active[char] = true
         
@@ -145,18 +130,28 @@ local function UpdateESP()
     end
 end
 
--- FUNÇÃO DE ALVO E HOOK (Mantidos iguais)
+-- ==========================================================
+-- 4. AIMBOT E TRIGGERBOT (CORRIGIDOS)
+-- ==========================================================
 local function GetClosestPlayer(fovOverride)
     local mouse, camPos = UserInputService:GetMouseLocation(), Camera.CFrame.Position
     local best, bestDist = nil, fovOverride or Config.Aimbot.FOV
-    for char, data in pairs(getgenv().Cobble.Cache) do
+    
+    -- Se o FOV for muito grande (ex: 360), ignora a verificação de distância da tela
+    local checkFov = bestDist < 360
+    
+    for char, data in pairs(CachedPlayers) do
         if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
-        local part = char:FindFirstChild(Config.Aimbot.TargetPart) or data.Root
+        
+        -- Tenta Head, se não tiver, Torso, se não tiver, Root
+        local part = char:FindFirstChild("Head") or char:FindFirstChild("Torso") or data.Root
         if part then
             local sp = Camera:WorldToViewportPoint(part.Position)
             if sp.Z > 0 then
                 local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
-                if d < bestDist then best, bestDist = part, d end
+                if (not checkFov) or (d < bestDist) then
+                    best, bestDist = part, d
+                end
             end
         end
     end
@@ -180,7 +175,15 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
--- LOOPS DE RENDER
+-- ==========================================================
+-- 5. LOOPS
+-- ==========================================================
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5; fovCircle.NumSides = 60; fovCircle.Color = Color3.fromRGB(90, 140, 255)
+
+local crosshair = Drawing.new("Circle")
+crosshair.Thickness = 1; crosshair.NumSides = 4; crosshair.Filled = true; crosshair.Color = Color3.fromRGB(0, 255, 0)
+
 RunService.RenderStepped:Connect(function()
     UpdateESP()
     if Config.Util.Crosshair then
@@ -192,14 +195,38 @@ RunService.RenderStepped:Connect(function()
     if Config.Util.Fullbright then
         Lighting.Ambient = Color3.new(1,1,1); Lighting.OutdoorAmbient = Color3.new(1,1,1); Lighting.Brightness = 2
     end
+    
+    fovCircle.Visible = Config.Aimbot.Enabled
+    if fovCircle.Visible then
+        fovCircle.Position = UserInputService:GetMouseLocation()
+        fovCircle.Radius = Config.Aimbot.FOV
+    end
 end)
 
-RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 101, function(dt)
+-- TRIGGERBOT MELHORADO (Usa press/release em vez de click)
+task.spawn(function()
+    while task.wait(Config.Triggerbot.Delay) do
+        if not Config.Triggerbot.Enabled then continue end
+        local target = GetClosestPlayer(Config.Triggerbot.FOV)
+        if target then
+            pcall(function()
+                if mouse1press and mouse1release then
+                    mouse1press(); task.wait(0.01); mouse1release()
+                elseif VirtualUser then
+                    VirtualUser:CaptureController(); VirtualUser:ClickButton1(Vector2.new(0, 0))
+                end
+            end)
+        end
+    end
+end)
+
+-- FOV CHANGER (Com prioridade correta)
+RunService:BindToRenderStep("CobbleFOV", Enum.RenderPriority.Camera.Value + 1, function(dt)
     if Config.Util.FOVChanger then Camera.FieldOfView = Config.Util.FOVValue else Camera.FieldOfView = 70 end
 end)
 
 getgenv().Cobble_Unload = function()
-    pcall(function() RunService:UnbindFromRenderStep("CobbleAim") end)
+    pcall(function() RunService:UnbindFromRenderStep("CobbleFOV") end)
     for _, obj in pairs(espObjects) do for _, d in pairs(obj) do pcall(function() d:Remove() end) end end
     for _, h in pairs(chamsObjects) do pcall(function() h:Destroy() end) end
     pcall(function() fovCircle:Remove() end)
