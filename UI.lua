@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED PRO)
+-- cobble hills UI (ENTRENCHED PRO V2)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Config = getgenv().CobbleConfig
@@ -68,7 +68,6 @@ Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 Scroll.Parent = ContentContainer
 Instance.new("UIListLayout", Scroll).Padding = UDim.new(0, 8)
 
--- Funções de Criação de Componentes
 local function MakeTab(text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 35)
@@ -199,7 +198,6 @@ local function MakeSlider(text, min, max, get, set)
     refresh()
 end
 
--- Abas
 local Tabs = { Visuals = MakeTab("Visuals"), Combat = MakeTab("Combat"), Utils = MakeTab("Utils") }
 
 local function LoadTab(tabName)
@@ -216,7 +214,7 @@ local function LoadTab(tabName)
         MakeToggle("Team Check", function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
     elseif tabName == "Combat" then
         MakeToggle("Aimbot Enabled", function() return Config.Aimbot.Enabled end, function(v) Config.Aimbot.Enabled = v end)
-        MakeToggle("Silent Aim", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
+        MakeToggle("Silent Aim (Magic)", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
         MakeToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
         MakeToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
         
@@ -225,8 +223,10 @@ local function LoadTab(tabName)
         MakeSlider("Prediction", 0, 0.5, function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
 
         MakeToggle("Triggerbot", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
-        MakeSlider("Triggerbot Delay", 0.01, 0.2, function() return Config.Triggerbot.Delay end, function(v) Config.Triggerbot.Delay = v end)
+        MakeSlider("Trigger FOV", 5, 50, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
+        MakeSlider("Trigger Delay", 0.01, 0.2, function() return Config.Triggerbot.Delay end, function(v) Config.Triggerbot.Delay = v end)
     elseif tabName == "Utils" then
+        MakeToggle("No Spread (100%)", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
         MakeToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
         MakeSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size end, function(v) Config.Hitbox.Size = v end)
         MakeToggle("Fullbright", function() return Config.Util.Fullbright end, function(v) Config.Util.Fullbright = v end)
@@ -243,7 +243,6 @@ Tabs.Combat.MouseButton1Click:Connect(function() LoadTab("Combat") end)
 Tabs.Utils.MouseButton1Click:Connect(function() LoadTab("Utils") end)
 LoadTab("Visuals")
 
--- Keybind para mostrar/esconder o menu (RightShift)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then Gui.Enabled = not Gui.Enabled end
