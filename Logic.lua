@@ -1,11 +1,11 @@
--- cobble hills logic (ENTRENCHED PRO V6 - Anti-Crash)
+-- cobble hills logic (ENTRENCHED PRO V7)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Lighting       = game:GetService("Lighting")
-local Workspace      = game:GetService("Workspace")
+local Lighting         = game:GetService("Lighting")
+local Workspace        = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera      = Workspace.CurrentCamera
@@ -24,15 +24,13 @@ local Config        = getgenv().CobbleConfig
 local CachedPlayers = {}
 local espObjects    = {}
 local fovCircle     = Drawing.new("Circle")
-
--- VARIÁVEL DE CONTROLE ANTI-CRASH (Impede loop infinito no Raycast)
-local isCheckingWall = false 
+local CurrentTarget = nil -- Cache do alvo atual (Evita crashes)
 
 fovCircle.Thickness = 1.5
 fovCircle.NumSides  = 60
 fovCircle.Color     = Color3.fromRGB(90, 140, 255)
 
--- CACHE
+-- CACHE DE JOGADORES
 task.spawn(function()
     while task.wait(0.5) do
         local temp = {}
@@ -49,7 +47,7 @@ task.spawn(function()
     end
 end)
 
--- HITBOX EXPANDER (Otimizado com task.wait em vez de Stepped 60fps)
+-- HITBOX EXPANDER
 task.spawn(function()
     while task.wait(0.1) do
         if not Config.Hitbox.Enabled then continue end
@@ -64,6 +62,53 @@ task.spawn(function()
                     part.CanCollide   = false
                 end
             end
+        end
+    end
+end)
+
+-- LÓGICA DO ALVO (Roda em segundo plano para não sobrecarregar os hooks)
+local function GetClosestPlayer(fovOverride)
+    local mouse      = UserInputService:GetMouseLocation()
+    local camPos     = Camera.CFrame.Position
+    local currentFov = fovOverride or Config.Aimbot.FOV
+    local best, bestDist = nil, currentFov
+
+    for char, data in pairs(CachedPlayers) do
+        local plr = data.Player
+        if Config.ESP.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+
+        local part = char:FindFirstChild(Config.Aimbot.TargetPart) or char:FindFirstChild("HumanoidRootPart")
+        if part then
+            local sp = Camera:WorldToViewportPoint(part.Position)
+            if sp.Z > 0 then
+                local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
+                if d < bestDist then 
+                    -- O WallCheck só roda no candidato mais próximo para economizar processamento
+                    if Config.Aimbot.WallCheck then
+                        local params = RaycastParams.new()
+                        params.FilterDescendantsInstances = {LocalPlayer.Character}
+                        params.FilterType = Enum.RaycastFilterType.Exclude
+                        local result = Workspace:Raycast(camPos, part.Position - camPos, params)
+                        if not (result and result.Instance and not result.Instance:IsDescendantOf(char)) then
+                            best, bestDist = part, d
+                        end
+                    else
+                        best, bestDist = part, d
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- Atualiza o CurrentTarget 30 vezes por segundo (Fim do crash)
+task.spawn(function()
+    while task.wait(0.03) do
+        if Config.Aimbot.Enabled then
+            CurrentTarget = GetClosestPlayer()
+        else
+            CurrentTarget = nil
         end
     end
 end)
@@ -153,108 +198,52 @@ local function UpdateESP()
     end
 end
 
--- AIMBOT
-local function GetClosestPlayer(fovOverride)
-    local mouse      = UserInputService:GetMouseLocation()
-    local camPos     = Camera.CFrame.Position
-    local currentFov = fovOverride or Config.Aimbot.FOV
-    local best, bestDist = nil, currentFov
-
-    for char, data in pairs(CachedPlayers) do
-        local plr = data.Player
-        if Config.ESP.TeamCheck and plr.Team == LocalPlayer.Team then continue end
-
-        local part = char:FindFirstChild(Config.Aimbot.TargetPart) or char:FindFirstChild("HumanoidRootPart")
-        if part then
-            if Config.Aimbot.WallCheck then
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {LocalPlayer.Character}
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                
-                -- TRAVA DE SEGURANÇA: Ativa a flag antes de fazer o Raycast
-                isCheckingWall = true
-                local result = Workspace:Raycast(camPos, part.Position - camPos, params)
-                isCheckingWall = false -- Desativa logo depois
-
-                if result and result.Instance and not result.Instance:IsDescendantOf(char) then
-                    continue
-                end
-            end
-
-            local sp = Camera:WorldToViewportPoint(part.Position)
-            if sp.Z > 0 then
-                local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
-                if d < bestDist then best, bestDist = part, d end
-            end
-        end
-    end
-    return best
-end
-
--- SILENT AIM (Hook Index)
+-- SILENT AIM (Hook Index usando Cache)
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
     if self == Mouse and (key == "Hit" or key == "Target") then
         local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
             and UserInputService:IsKeyDown(Config.Aimbot.Key)
             or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
-        if Config.Aimbot.Enabled and Config.Aimbot.Silent and isDown then
-            local target = GetClosestPlayer()
-            if target then
-                local predicted = target.Position + (target.AssemblyLinearVelocity * Config.Aimbot.Prediction)
-                return key == "Hit" and CFrame.new(predicted) or target
-            end
+        if Config.Aimbot.Enabled and Config.Aimbot.Silent and isDown and CurrentTarget then
+            local predicted = CurrentTarget.Position + (CurrentTarget.AssemblyLinearVelocity * Config.Aimbot.Prediction)
+            return key == "Hit" and CFrame.new(predicted) or CurrentTarget
         end
     end
     return oldIndex(self, key)
 end)
 
--- NO SPREAD (Hook Namecall com trava de segurança)
+-- NO SPREAD (Hook Namecall usando Cache)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
-    -- A flag isCheckingWall impede que o WallCheck ative o NoSpread e crie loop infinito
-    if Config.Util.NoSpread and not isCheckingWall and (method == "Raycast" or method == "FindPartOnRay") then
+    if Config.Util.NoSpread and (method == "Raycast" or method == "FindPartOnRay") then
         local args = {...}
         if method == "Raycast" then
             local origin, direction, params = args[1], args[2], args[3]
-            local target = Config.Aimbot.Enabled and GetClosestPlayer()
-            if target then
-                direction = (target.Position - origin).Unit * direction.Magnitude
-            else
-                local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                direction = unitRay.Direction * direction.Magnitude
-            end
-            return oldNamecall(self, origin, direction, params)
+            -- Se tiver alvo, puxa pro alvo. Se não, força a ir reto na câmera.
+            local targetDir = CurrentTarget and (CurrentTarget.Position - origin).Unit or Camera.CFrame.LookVector
+            return oldNamecall(self, origin, targetDir * direction.Magnitude, params)
         elseif method == "FindPartOnRay" then
             local ray, ignore = args[1], args[2]
-            local target = Config.Aimbot.Enabled and GetClosestPlayer()
-            if target then
-                ray = Ray.new(ray.Origin, (target.Position - ray.Origin).Unit * ray.Direction.Magnitude)
-            else
-                local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                ray = Ray.new(ray.Origin, unitRay.Direction * ray.Direction.Magnitude)
-            end
-            return oldNamecall(self, ray, ignore)
+            local targetDir = CurrentTarget and (CurrentTarget.Position - ray.Origin).Unit or Camera.CFrame.LookVector
+            return oldNamecall(self, Ray.new(ray.Origin, targetDir * ray.Direction.Magnitude), ignore)
         end
     end
     return oldNamecall(self, ...)
 end)
 
--- CAMERA LOCK AIMBOT
+-- CAMERA LOCK AIMBOT (Usando Cache)
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function(dt)
     if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
     local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
         and UserInputService:IsKeyDown(Config.Aimbot.Key)
         or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
-    if isDown then
-        local target = GetClosestPlayer()
-        if target then
-            local desired = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-            local alpha = 1 - (1 - Config.Aimbot.Smoothness)^(dt * 60)
-            Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
-        end
+    if isDown and CurrentTarget then
+        local desired = CFrame.lookAt(Camera.CFrame.Position, CurrentTarget.Position)
+        local alpha = 1 - (1 - Config.Aimbot.Smoothness)^(dt * 60)
+        Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
     end
 end)
 
