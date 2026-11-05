@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED GOD MODE - REMOTE HOOK)
+-- cobble hills logic (ENTRENCHED V12 - ANTI JAM)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players          = game:GetService("Players")
@@ -7,19 +7,28 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace        = game:GetService("Workspace")
 local Lighting         = game:GetService("Lighting")
 local ReplicatedStorage= game:GetService("ReplicatedStorage")
+local VirtualUser      = game:GetService("VirtualUser")
+local VIM              = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera      = Workspace.CurrentCamera
 local Mouse       = LocalPlayer:GetMouse()
 
-getgenv().CobbleConfig = {
-    ESP = { Enabled = true, Box = true, Chams = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
-    Aimbot = { Enabled = true, Silent = true, TargetPart = "Head" }, -- Simplificado, pois agora usamos o Remote
-    Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
-    Util = { Fullbright = false, NoSpread = true, NoRecoil = true, FOVChanger = false, FOVValue = 90, Crosshair = true }
+getgenv().Cobble = {
+    Config = {
+        ESP = { Enabled = true, Box = true, Chams = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
+        Aimbot = { Enabled = true, Silent = true, TargetPart = "Head" },
+        Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
+        Util = { Fullbright = false, NoSpread = true, NoRecoil = true, FOVChanger = false, FOVValue = 90, Crosshair = true, InfAmmo = true }
+    },
+    Cache = {},
+    ESPObjects = {},
+    ChamsObjects = {},
+    Target = nil,
+    Ballistic = { Speed = 1000, Gravity = Workspace.Gravity }
 }
 
-local Config = getgenv().CobbleConfig
+local Config = getgenv().Cobble.Config
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1.5; fovCircle.NumSides = 60; fovCircle.Color = Color3.fromRGB(90, 140, 255)
@@ -28,7 +37,6 @@ local crosshair = Drawing.new("Circle")
 crosshair.Thickness = 1; crosshair.NumSides = 4; crosshair.Filled = true; crosshair.Color = Color3.fromRGB(0, 255, 0)
 
 -- CACHE DE JOGADORES
-local CachedPlayers = {}
 task.spawn(function()
     while task.wait(0.2) do
         local temp = {}
@@ -41,13 +49,15 @@ task.spawn(function()
                 end
             end
         end
-        CachedPlayers = temp
+        getgenv().Cobble.Cache = temp
     end
 end)
 
--- ARMA E BALÍSTICA
+-- ============================================================
+-- GUN MODS SEGUROS (No Spread, No Recoil, Inf Ammo)
+-- ============================================================
 task.spawn(function()
-    while task.wait(0.05) do
+    while task.wait(0.1) do -- 10x por segundo é o suficiente e não trava
         local containers = {LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")}
         for _, container in pairs(containers) do
             if container then
@@ -57,11 +67,23 @@ task.spawn(function()
                         if gunStates then
                             pcall(function()
                                 local states = require(gunStates)
+                                
+                                -- No Spread / Recoil
                                 if Config.Util.NoSpread then
                                     states.Spread = 0; states.MinSpread = 0; states.MaxSpread = 0; states.SpreadIncrease = 0
                                 end
                                 if Config.Util.NoRecoil then
                                     states.Recoil = 0; states.MinRecoil = 0; states.MaxRecoil = 0; states.CameraRecoil = 0
+                                end
+                                
+                                -- Infinite Ammo Seguro (Não trava a arma)
+                                if Config.Util.InfAmmo then
+                                    if states.Clip then states.Clip = 999 end
+                                    if states.Ammo then states.Ammo = 999 end
+                                    if states.MaxAmmo then states.MaxAmmo = 999 end
+                                    if states.ClipSize then states.ClipSize = 999 end
+                                    -- Recarga Instantânea
+                                    if states.ReloadTime then states.ReloadTime = 0 end
                                 end
                             end)
                         end
@@ -72,7 +94,7 @@ task.spawn(function()
     end
 end)
 
--- ESP E CHAMS (Mesma lógica de antes)
+-- ESP E CHAMS
 local espObjects, chamsObjects = {}, {}
 local function UpdateESP()
     if not Config.ESP.Enabled then
@@ -80,11 +102,10 @@ local function UpdateESP()
         return
     end
     local active = {}
-    for char, data in pairs(CachedPlayers) do
+    for char, data in pairs(getgenv().Cobble.Cache) do
         if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
         active[char] = true
         
-        -- Chams
         if Config.ESP.Chams then
             if not chamsObjects[char] then
                 local h = Instance.new("Highlight")
@@ -94,7 +115,6 @@ local function UpdateESP()
             end
         elseif chamsObjects[char] then chamsObjects[char]:Destroy(); chamsObjects[char] = nil end
 
-        -- ESP 2D
         if not espObjects[char] then
             espObjects[char] = { box = Drawing.new("Square"), name = Drawing.new("Text"), dist = Drawing.new("Text"), healthBg = Drawing.new("Square"), healthFg = Drawing.new("Square"), tracer = Drawing.new("Line") }
             local o = espObjects[char]
@@ -125,11 +145,11 @@ local function UpdateESP()
     end
 end
 
--- FUNÇÃO DE ALVO
+-- FUNÇÃO DE ALVO E HOOK (Mantidos iguais)
 local function GetClosestPlayer(fovOverride)
     local mouse, camPos = UserInputService:GetMouseLocation(), Camera.CFrame.Position
-    local best, bestDist = nil, fovOverride or 360 -- Pega o mais próximo
-    for char, data in pairs(CachedPlayers) do
+    local best, bestDist = nil, fovOverride or Config.Aimbot.FOV
+    for char, data in pairs(getgenv().Cobble.Cache) do
         if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
         local part = char:FindFirstChild(Config.Aimbot.TargetPart) or data.Root
         if part then
@@ -143,30 +163,20 @@ local function GetClosestPlayer(fovOverride)
     return best
 end
 
--- ============================================================
--- O HOOK DO SHOOT (A VERDADEIRA BALA MÁGICA)
--- ============================================================
 local shootRemote = ReplicatedStorage:WaitForChild("ServerEvents"):WaitForChild("Shoot")
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    
-    -- Se o jogo tentar atirar, a gente intercepta
     if self == shootRemote and method == "FireServer" then
         local args = {...}
-        
         if Config.Aimbot.Enabled and Config.Aimbot.Silent then
             local targetPart = GetClosestPlayer()
             if targetPart then
-                -- O Arg 2 é o AimPoint. Troca pela cabeça do inimigo.
                 args[2] = targetPart.Position
             end
         end
-        
-        -- Chama a função original passando os argumentos modificados
         return oldNamecall(self, table.unpack(args))
     end
-    
     return oldNamecall(self, ...)
 end)
 
@@ -184,7 +194,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- FOV CHANGER E TRIGGERBOT (Mantidos)
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 101, function(dt)
     if Config.Util.FOVChanger then Camera.FieldOfView = Config.Util.FOVValue else Camera.FieldOfView = 70 end
 end)
