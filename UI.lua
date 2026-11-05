@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED EDITION)
+-- cobble hills UI (ENTRENCHED REAL FIX)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Config = getgenv().CobbleConfig
@@ -185,7 +185,7 @@ local function MakeSlider(text, min, max, get, set)
     local dragging = false
     local function setFromX(x)
         local a = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-        set(math.floor(min + (max - min) * a))
+        set(min + (max - min) * a)
         refresh()
     end
 
@@ -213,24 +213,12 @@ local function LoadTab(tabName)
         MakeToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
         MakeToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
         
-        local tBtn = Instance.new("TextButton")
-        tBtn.Size = UDim2.new(1, 0, 0, 35)
-        tBtn.BackgroundColor3 = Theme.surface
-        tBtn.Text = "Target: " .. Config.Aimbot.TargetPart
-        tBtn.TextColor3 = Theme.text
-        tBtn.Font = Enum.Font.Gotham
-        tBtn.Parent = Scroll
-        Instance.new("UICorner", tBtn).CornerRadius = UDim.new(0, 6)
-        tBtn.MouseButton1Click:Connect(function()
-            Config.Aimbot.TargetPart = (Config.Aimbot.TargetPart == "Head") and "HumanoidRootPart" or "Head"
-            tBtn.Text = "Target: " .. Config.Aimbot.TargetPart
-        end)
-
         MakeSlider("FOV", 20, 300, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
         MakeSlider("Smoothness", 0.05, 1, function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
     elseif tabName == "Utils" then
+        MakeToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
+        MakeSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size end, function(v) Config.Hitbox.Size = v end)
         MakeToggle("Fullbright", function() return Config.Util.Fullbright end, function(v) Config.Util.Fullbright = v end)
-        MakeSlider("Hitbox Expand (Studs)", 0, 5, function() return Config.Aimbot.HitboxExpand end, function(v) Config.Aimbot.HitboxExpand = v end)
         
         MakeButton("UNLOAD SCRIPT", Color3.fromRGB(255, 80, 80), function()
             if getgenv().Cobble_Unload then getgenv().Cobble_Unload() end
