@@ -1,252 +1,278 @@
--- cobble hills UI (ENTRENCHED PRO V6)
+-- cobble hills UI (MASTERPIECE EDITION)
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
-local Config           = getgenv().CobbleConfig
+local Config           = getgenv().Cobble.Config
 
 local Theme = {
-    bg      = Color3.fromRGB(15, 16, 20),
-    sidebar = Color3.fromRGB(20, 21, 27),
-    surface = Color3.fromRGB(30, 32, 40),
-    text    = Color3.fromRGB(220, 222, 230),
-    muted   = Color3.fromRGB(120, 126, 142),
-    accent  = Color3.fromRGB(90, 140, 255),
-    off     = Color3.fromRGB(45, 48, 56)
+    Bg      = Color3.fromRGB(16, 18, 25),
+    Sidebar = Color3.fromRGB(22, 24, 33),
+    Surface = Color3.fromRGB(30, 33, 45),
+    Text    = Color3.fromRGB(240, 242, 250),
+    Muted   = Color3.fromRGB(120, 126, 145),
+    Accent  = Color3.fromRGB(90, 140, 255),
+    Off     = Color3.fromRGB(40, 44, 58)
 }
 
 local function Tween(inst, props, time)
-    TweenService:Create(inst, TweenInfo.new(time or 0.2, Enum.EasingStyle.Quad), props):Play()
+    TweenService:Create(inst, TweenInfo.new(time or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name           = "cobble_entrenched_pro"
-Gui.ResetOnSpawn   = false
+Gui.Name = "CobbleMaster"
+Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
 local ok, hui = pcall(function() return gethui and gethui() end)
 Gui.Parent = (ok and hui) or game:GetService("CoreGui")
 
+-- Main Frame
 local Main = Instance.new("Frame")
-Main.Size             = UDim2.fromOffset(520, 450)
-Main.Position         = UDim2.new(0.5, -260, 0.5, -225)
-Main.BackgroundColor3 = Theme.bg
-Main.BorderSizePixel  = 0
-Main.Parent           = Gui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", Main)
-stroke.Color        = Theme.accent
-stroke.Transparency = 0.8
+Main.Size = UDim2.fromOffset(540, 460)
+Main.Position = UDim2.new(0.5, -270, 0.5, -230)
+Main.BackgroundColor3 = Theme.Bg
+Main.BorderSizePixel = 0
+Main.Parent = Gui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local shadow = Instance.new("ImageLabel")
+shadow.Size = UDim2.new(1, 40, 1, 40)
+shadow.Position = UDim2.new(0, -20, 0, -20)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.new(0,0,0)
+shadow.ImageTransparency = 0.6
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.Parent = Main
 
+-- Header (Título)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundTransparency = 1
+TitleBar.Parent = Main
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -30, 1, 0)
+TitleText.Position = UDim2.fromOffset(20, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Font = Enum.Font.GothamBold
+TitleText.Text = "COBBLE <font color='#5A8CFF'>HILLS</font>"
+TitleText.RichText = true
+TitleText.TextColor3 = Theme.Text
+TitleText.TextSize = 18
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+-- Sidebar
 local Sidebar = Instance.new("Frame")
-Sidebar.Size             = UDim2.new(0, 140, 1, 0)
-Sidebar.BackgroundColor3 = Theme.sidebar
-Sidebar.Parent           = Main
+Sidebar.Size = UDim2.new(0, 140, 1, -70)
+Sidebar.Position = UDim2.new(0, 15, 0, 55)
+Sidebar.BackgroundColor3 = Theme.Sidebar
+Sidebar.Parent = Main
 Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
 
-local Title = Instance.new("TextLabel")
-Title.Size               = UDim2.new(1, 0, 0, 50)
-Title.BackgroundTransparency = 1
-Title.Font               = Enum.Font.GothamBold
-Title.Text               = "COBBLE.CC"
-Title.TextColor3         = Theme.accent
-Title.TextSize           = 16
-Title.Parent             = Sidebar
-
 local TabContainer = Instance.new("Frame")
-TabContainer.Size               = UDim2.new(1, -20, 1, -60)
-TabContainer.Position           = UDim2.new(0, 10, 0, 50)
+TabContainer.Size = UDim2.new(1, -20, 1, -20)
+TabContainer.Position = UDim2.new(0, 10, 0, 10)
 TabContainer.BackgroundTransparency = 1
-TabContainer.Parent             = Sidebar
-Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 5)
+TabContainer.Parent = Sidebar
+Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 8)
 
-local ContentContainer = Instance.new("Frame")
-ContentContainer.Size               = UDim2.new(1, -160, 1, -20)
-ContentContainer.Position           = UDim2.new(0, 150, 0, 10)
-ContentContainer.BackgroundTransparency = 1
-ContentContainer.Parent             = Main
+-- Content
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -170, 1, -70)
+Content.Position = UDim2.new(0, 165, 0, 55)
+Content.BackgroundColor3 = Theme.Sidebar
+Content.Parent = Main
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 10)
 
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size                  = UDim2.new(1, 0, 1, 0)
+Scroll.Size = UDim2.new(1, -20, 1, -20)
+Scroll.Position = UDim2.new(0, 10, 0, 10)
 Scroll.BackgroundTransparency = 1
-Scroll.ScrollBarThickness    = 2
-Scroll.ScrollBarImageColor3  = Theme.accent
-Scroll.CanvasSize            = UDim2.new(0, 0, 0, 0)
-Scroll.Parent                = ContentContainer
+Scroll.ScrollBarThickness = 3
+Scroll.ScrollBarImageColor3 = Theme.Accent
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.Parent = Content
 
 local ScrollLayout = Instance.new("UIListLayout", Scroll)
-ScrollLayout.Padding = UDim.new(0, 8)
+ScrollLayout.Padding = UDim.new(0, 10)
 ScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Scroll.CanvasSize = UDim2.new(0, 0, 0, ScrollLayout.AbsoluteContentSize.Y + 10)
 end)
 
-local function MakeTab(text)
+-- Elements Functions
+local function CreateTab(text)
     local btn = Instance.new("TextButton")
-    btn.Size             = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = Theme.bg
-    btn.Font             = Enum.Font.GothamMedium
-    btn.Text             = text
-    btn.TextColor3       = Theme.muted
-    btn.TextSize         = 13
-    btn.Parent           = TabContainer
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Theme.Bg
+    btn.Font = Enum.Font.GothamMedium
+    btn.Text = text
+    btn.TextColor3 = Theme.Muted
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    btn.Parent = TabContainer
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     return btn
 end
 
-local function MakeToggle(text, get, set)
+local function CreateToggle(text, get, set)
     local row = Instance.new("Frame")
-    row.Size               = UDim2.new(1, 0, 0, 30)
+    row.Size = UDim2.new(1, 0, 0, 32)
     row.BackgroundTransparency = 1
-    row.Parent             = Scroll
+    row.Parent = Scroll
 
     local label = Instance.new("TextLabel")
-    label.Size               = UDim2.new(1, -60, 1, 0)
+    label.Size = UDim2.new(1, -60, 1, 0)
     label.BackgroundTransparency = 1
-    label.Font               = Enum.Font.Gotham
-    label.Text               = text
-    label.TextColor3         = Theme.text
-    label.TextSize           = 13
-    label.TextXAlignment     = Enum.TextXAlignment.Left
-    label.Parent             = row
+    label.Font = Enum.Font.GothamMedium
+    label.Text = text
+    label.TextColor3 = Theme.Text
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
 
     local track = Instance.new("Frame")
-    track.AnchorPoint    = Vector2.new(1, 0.5)
-    track.Position       = UDim2.new(1, 0, 0.5, 0)
-    track.Size           = UDim2.fromOffset(36, 18)
-    track.BackgroundColor3 = Theme.off
-    track.Parent         = row
+    track.AnchorPoint = Vector2.new(1, 0.5)
+    track.Position = UDim2.new(1, 0, 0.5, 0)
+    track.Size = UDim2.fromOffset(38, 20)
+    track.BackgroundColor3 = Theme.Off
+    track.Parent = row
     Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
     local dot = Instance.new("Frame")
-    dot.Size             = UDim2.fromOffset(14, 14)
-    dot.Position         = UDim2.fromOffset(2, 2)
-    dot.BackgroundColor3 = Theme.muted
-    dot.Parent           = track
+    dot.Size = UDim2.fromOffset(16, 16)
+    dot.Position = UDim2.fromOffset(2, 2)
+    dot.BackgroundColor3 = Theme.Muted
+    dot.Parent = track
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local btn = Instance.new("TextButton")
-    btn.Size               = UDim2.fromScale(1, 1)
+    btn.Size = UDim2.fromScale(1, 1)
     btn.BackgroundTransparency = 1
-    btn.Text               = ""
-    btn.Parent             = row
+    btn.Text = ""
+    btn.Parent = row
 
-    local function refresh()
+    local function Refresh()
         if get() then
-            Tween(track, { BackgroundColor3 = Theme.accent })
-            Tween(dot,   { Position = UDim2.fromOffset(20, 2), BackgroundColor3 = Color3.new(1,1,1) })
+            Tween(track, {BackgroundColor3 = Theme.Accent})
+            Tween(dot, {Position = UDim2.fromOffset(20, 2), BackgroundColor3 = Color3.new(1,1,1)})
         else
-            Tween(track, { BackgroundColor3 = Theme.off })
-            Tween(dot,   { Position = UDim2.fromOffset(2, 2),  BackgroundColor3 = Theme.muted })
+            Tween(track, {BackgroundColor3 = Theme.Off})
+            Tween(dot, {Position = UDim2.fromOffset(2, 2), BackgroundColor3 = Theme.Muted})
         end
     end
-    btn.MouseButton1Click:Connect(function() set(not get()); refresh() end)
-    refresh()
+    btn.MouseButton1Click:Connect(function() set(not get()); Refresh() end)
+    Refresh()
 end
 
-local function MakeButton(text, color, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size             = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = color
-    btn.Font             = Enum.Font.GothamBold
-    btn.TextColor3       = Color3.new(1,1,1)
-    btn.TextSize         = 13
-    btn.Text             = text
-    btn.Parent           = Scroll
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(callback)
-end
-
-local function MakeSlider(text, min, max, get, set)
+local function CreateSlider(text, min, max, get, set)
     local holder = Instance.new("Frame")
-    holder.Size               = UDim2.new(1, 0, 0, 45)
+    holder.Size = UDim2.new(1, 0, 0, 48)
     holder.BackgroundTransparency = 1
-    holder.Parent             = Scroll
+    holder.Parent = Scroll
 
     local label = Instance.new("TextLabel")
-    label.Size               = UDim2.new(1, -50, 0, 15)
+    label.Size = UDim2.new(1, -50, 0, 16)
     label.BackgroundTransparency = 1
-    label.Font               = Enum.Font.Gotham
-    label.Text               = text
-    label.TextColor3         = Theme.text
-    label.TextSize           = 13
-    label.TextXAlignment     = Enum.TextXAlignment.Left
-    label.Parent             = holder
+    label.Font = Enum.Font.GothamMedium
+    label.Text = text
+    label.TextColor3 = Theme.Text
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
 
     local valText = Instance.new("TextLabel")
-    valText.Size             = UDim2.fromOffset(50, 15)
-    valText.Position         = UDim2.new(1, -50, 0, 0)
+    valText.Size = UDim2.fromOffset(50, 16)
+    valText.Position = UDim2.new(1, -50, 0, 0)
     valText.BackgroundTransparency = 1
-    valText.Font             = Enum.Font.Gotham
-    valText.TextColor3       = Theme.muted
-    valText.TextSize         = 12
-    valText.TextXAlignment   = Enum.TextXAlignment.Right
-    valText.Parent           = holder
+    valText.Font = Enum.Font.Gotham
+    valText.TextColor3 = Theme.Accent
+    valText.TextSize = 12
+    valText.TextXAlignment = Enum.TextXAlignment.Right
+    valText.Parent = holder
 
     local track = Instance.new("Frame")
-    track.Size             = UDim2.new(1, 0, 0, 6)
-    track.Position         = UDim2.new(0, 0, 0, 25)
-    track.BackgroundColor3 = Theme.off
-    track.Parent           = holder
+    track.Size = UDim2.new(1, 0, 0, 6)
+    track.Position = UDim2.new(0, 0, 0, 26)
+    track.BackgroundColor3 = Theme.Off
+    track.Parent = holder
     Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
     local fill = Instance.new("Frame")
-    fill.Size             = UDim2.new(0, 0, 1, 0)
-    fill.BackgroundColor3 = Theme.accent
-    fill.Parent           = track
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = Theme.Accent
+    fill.Parent = track
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
-    local function refresh()
-        -- PROTEÇÃO EXTREMA: Se por algum motivo vier boolean, converte pra número
+    local handle = Instance.new("Frame")
+    handle.Size = UDim2.fromOffset(14, 14)
+    handle.AnchorPoint = Vector2.new(0.5, 0.5)
+    handle.Position = UDim2.new(0, 0, 0.5, 0)
+    handle.BackgroundColor3 = Color3.new(1,1,1)
+    handle.Parent = track
+    Instance.new("UICorner", handle).CornerRadius = UDim.new(1, 0)
+
+    local function Refresh()
         local v = tonumber(get()) or min
         local a = math.clamp((v - min) / (max - min), 0, 1)
         fill.Size = UDim2.new(a, 0, 1, 0)
+        handle.Position = UDim2.new(a, 0, 0.5, 0)
         valText.Text = (math.floor(v) == v) and tostring(math.floor(v)) or string.format("%.2f", v)
     end
 
     local dragging = false
-    local function setFromX(x)
+    local function SetFromX(x)
         local a = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
         set(min + (max - min) * a)
-        refresh()
+        Refresh()
     end
 
-    track.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; setFromX(i.Position.X) end
-    end)
-    UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then setFromX(i.Position.X) end
-    end)
-    refresh()
+    track.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; SetFromX(i.Position.X) end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+    UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then SetFromX(i.Position.X) end end)
+    Refresh()
 end
 
-local function MakeBoneSelector(text, get, set)
+local function CreateSelector(text, options, get, set)
     local btn = Instance.new("TextButton")
-    btn.Size             = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = Theme.surface
-    btn.Font             = Enum.Font.Gotham
-    btn.TextColor3       = Theme.text
-    btn.TextSize         = 13
-    btn.Text             = text .. ": " .. tostring(get())
-    btn.Parent           = Scroll
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Theme.Surface
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextColor3 = Theme.Text
+    btn.TextSize = 13
+    btn.Text = text .. ": " .. tostring(get())
+    btn.AutoButtonColor = false
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
-    local bones = {"Head", "Torso", "HumanoidRootPart", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
     local idx = 1
-    for i, v in ipairs(bones) do
-        if v == get() then idx = i; break end
-    end
+    for i, v in ipairs(options) do if v == get() then idx = i; break end end
 
     btn.MouseButton1Click:Connect(function()
-        idx = idx % #bones + 1
-        set(bones[idx])
+        idx = idx % #options + 1
+        set(options[idx])
         btn.Text = text .. ": " .. tostring(get())
     end)
 end
 
+local function CreateButton(text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 13
+    btn.Text = text
+    btn.AutoButtonColor = false
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(callback)
+end
+
+-- Tabs Logic
 local Tabs = {
-    Visuals = MakeTab("Visuals"),
-    Combat  = MakeTab("Combat"),
-    Utils   = MakeTab("Utils")
+    Visuals = CreateTab("Visuals"),
+    Combat  = CreateTab("Combat"),
+    Utils   = CreateTab("Utils")
 }
 
 local function LoadTab(tabName)
@@ -254,36 +280,36 @@ local function LoadTab(tabName)
         if v:IsA("Frame") or v:IsA("TextButton") then v:Destroy() end
     end
     for name, btn in pairs(Tabs) do
-        btn.TextColor3 = (name == tabName) and Theme.accent or Theme.muted
+        btn.TextColor3 = (name == tabName) and Theme.Accent or Theme.Muted
     end
 
     if tabName == "Visuals" then
-        MakeToggle("ESP Enabled",  function() return Config.ESP.Enabled   end, function(v) Config.ESP.Enabled   = v end)
-        MakeToggle("Box",          function() return Config.ESP.Box       end, function(v) Config.ESP.Box       = v end)
-        MakeToggle("Name",         function() return Config.ESP.Name      end, function(v) Config.ESP.Name      = v end)
-        MakeToggle("Distance",     function() return Config.ESP.Dist      end, function(v) Config.ESP.Dist      = v end)
-        MakeToggle("Health Bar",   function() return Config.ESP.Health    end, function(v) Config.ESP.Health    = v end)
-        MakeToggle("Tracer",       function() return Config.ESP.Tracer    end, function(v) Config.ESP.Tracer    = v end)
-        MakeToggle("Team Check",   function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
+        CreateToggle("ESP Enabled", function() return Config.ESP.Enabled end, function(v) Config.ESP.Enabled = v end)
+        CreateToggle("Box", function() return Config.ESP.Box end, function(v) Config.ESP.Box = v end)
+        CreateToggle("Name", function() return Config.ESP.Name end, function(v) Config.ESP.Name = v end)
+        CreateToggle("Distance", function() return Config.ESP.Dist end, function(v) Config.ESP.Dist = v end)
+        CreateToggle("Health Bar", function() return Config.ESP.Health end, function(v) Config.ESP.Health = v end)
+        CreateToggle("Tracer", function() return Config.ESP.Tracer end, function(v) Config.ESP.Tracer = v end)
+        CreateToggle("Team Check", function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
 
     elseif tabName == "Combat" then
-        MakeToggle("Aimbot Enabled",   function() return Config.Aimbot.Enabled   end, function(v) Config.Aimbot.Enabled   = v end)
-        MakeToggle("Silent Aim",       function() return Config.Aimbot.Silent    end, function(v) Config.Aimbot.Silent    = v end)
-        MakeToggle("Hold Mode (RMB)",  function() return Config.Aimbot.HoldMode  end, function(v) Config.Aimbot.HoldMode  = v end)
-        MakeToggle("Wall Check",       function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
-        MakeBoneSelector("Target Bone", function() return Config.Aimbot.TargetPart end, function(v) Config.Aimbot.TargetPart = v end)
-        MakeSlider("FOV",        20,   300,  function() return Config.Aimbot.FOV        end, function(v) Config.Aimbot.FOV        = v end)
-        MakeSlider("Smoothness", 0.05, 1,    function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
-        MakeSlider("Prediction", 0,    0.5,  function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
-        MakeToggle("Triggerbot (Auto-Fire)", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
-        MakeSlider("Trigger FOV", 2, 30, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
+        CreateToggle("Aimbot Enabled", function() return Config.Aimbot.Enabled end, function(v) Config.Aimbot.Enabled = v end)
+        CreateToggle("Silent Aim", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
+        CreateToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
+        CreateToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
+        CreateSelector("Target Bone", {"Head", "Torso", "HumanoidRootPart"}, function() return Config.Aimbot.TargetPart end, function(v) Config.Aimbot.TargetPart = v end)
+        CreateSlider("FOV", 20, 300, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
+        CreateSlider("Smoothness", 0.05, 1, function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
+        CreateSlider("Prediction", 0, 0.5, function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
+        CreateToggle("Triggerbot (Auto-Fire)", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
+        CreateSlider("Trigger FOV", 2, 30, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
 
     elseif tabName == "Utils" then
-        MakeToggle("No Spread (100%)",  function() return Config.Util.NoSpread    end, function(v) Config.Util.NoSpread    = v end)
-        MakeToggle("Hitbox Expander",   function() return Config.Hitbox.Enabled   end, function(v) Config.Hitbox.Enabled   = v end)
-        MakeSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size     end, function(v) Config.Hitbox.Size      = v end)
-        MakeToggle("Fullbright",        function() return Config.Util.Fullbright  end, function(v) Config.Util.Fullbright  = v end)
-        MakeButton("UNLOAD SCRIPT", Color3.fromRGB(255, 80, 80), function()
+        CreateToggle("No Spread (100%)", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
+        CreateToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
+        CreateSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size end, function(v) Config.Hitbox.Size = v end)
+        CreateToggle("Fullbright", function() return Config.Util.Fullbright end, function(v) Config.Util.Fullbright = v end)
+        CreateButton("UNLOAD SCRIPT", Color3.fromRGB(255, 80, 80), function()
             if getgenv().Cobble_Unload then getgenv().Cobble_Unload() end
             Gui:Destroy()
         end)
@@ -291,10 +317,32 @@ local function LoadTab(tabName)
 end
 
 Tabs.Visuals.MouseButton1Click:Connect(function() LoadTab("Visuals") end)
-Tabs.Combat.MouseButton1Click:Connect(function()  LoadTab("Combat")  end)
-Tabs.Utils.MouseButton1Click:Connect(function()   LoadTab("Utils")   end)
+Tabs.Combat.MouseButton1Click:Connect(function() LoadTab("Combat") end)
+Tabs.Utils.MouseButton1Click:Connect(function() LoadTab("Utils") end)
 LoadTab("Visuals")
 
+-- Window Dragging
+local dragging, dragInput, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Panic Key
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then Gui.Enabled = not Gui.Enabled end
