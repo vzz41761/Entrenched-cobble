@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO)
+-- cobble hills logic (ENTRENCHED PRO V2)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players = game:GetService("Players")
@@ -14,9 +14,9 @@ local Mouse = LocalPlayer:GetMouse()
 getgenv().CobbleConfig = {
     ESP = { Enabled = true, Box = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
     Aimbot = { Enabled = true, Silent = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2, FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 },
-    Triggerbot = { Enabled = false, Key = Enum.UserInputType.MouseButton1, Delay = 0.05 },
+    Triggerbot = { Enabled = false, Key = Enum.UserInputType.MouseButton1, Delay = 0.05, FOV = 15 },
     Hitbox = { Enabled = false, Size = 10, Transparency = 0.5 },
-    Util = { Fullbright = false }
+    Util = { Fullbright = false, NoSpread = true }
 }
 
 local Config = getgenv().CobbleConfig
@@ -45,7 +45,7 @@ task.spawn(function()
     end
 end)
 
--- HITBOX EXPANDER (LOOP SEGURO)
+-- HITBOX EXPANDER
 task.spawn(function()
     while task.wait(1) do
         if not Config.Hitbox.Enabled then continue end
@@ -66,6 +66,18 @@ task.spawn(function()
         end
     end
 end)
+
+-- NO SPREAD (Hook no Raycast para a bala ir reta)
+local oldRaycast = workspace.Raycast
+workspace.Raycast = function(self, origin, direction, params)
+    if Config.Util.NoSpread and LocalPlayer.Character then
+        -- Pega a direção exata da câmera (ignora o offset de spread do jogo)
+        local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        -- Mantém a magnitude original da direção para não bugar a física
+        direction = unitRay.Direction * direction.Magnitude
+    end
+    return oldRaycast(self, origin, direction, params)
+end
 
 -- ESP
 local function UpdateESP()
@@ -91,7 +103,6 @@ local function UpdateESP()
                 dist = Drawing.new("Text"), healthBg = Drawing.new("Square"),
                 healthFg = Drawing.new("Square"), tracer = Drawing.new("Line")
             }
-            -- Configurações iniciais de cada objeto
             espObjects[char].box.Thickness = 1
             espObjects[char].box.Filled = false
             espObjects[char].name.Size = 13
@@ -118,13 +129,11 @@ local function UpdateESP()
             local w = h * 0.55
             local bx = topV.X - w * 0.5
 
-            -- Box
             obj.box.Visible = Config.ESP.Box
             obj.box.Color = Color3.fromRGB(255, 50, 50)
             obj.box.Position = Vector2.new(bx, topV.Y)
             obj.box.Size = Vector2.new(w, h)
 
-            -- Health
             local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
             obj.healthBg.Visible = Config.ESP.Health
             obj.healthBg.Position = Vector2.new(bx - 6, topV.Y)
@@ -134,7 +143,6 @@ local function UpdateESP()
             obj.healthFg.Size = Vector2.new(3, h * hp)
             obj.healthFg.Color = Color3.fromRGB(240, 90, 90):Lerp(Color3.fromRGB(80, 220, 130), hp)
 
-            -- Name & Distance
             obj.name.Visible = Config.ESP.Name
             obj.name.Text = plr.Name
             obj.name.Color = Color3.fromRGB(255, 255, 255)
@@ -145,7 +153,6 @@ local function UpdateESP()
             obj.dist.Color = Color3.fromRGB(200, 200, 200)
             obj.dist.Position = Vector2.new(topV.X, botV.Y + 2)
 
-            -- Tracer
             obj.tracer.Visible = Config.ESP.Tracer
             obj.tracer.Color = Color3.fromRGB(255, 50, 50)
             obj.tracer.From = Vector2.new(screenCenter.X, Camera.ViewportSize.Y)
@@ -155,7 +162,6 @@ local function UpdateESP()
         end
     end
 
-    -- Limpeza de objetos de jogadores que saíram
     for char, obj in pairs(espObjects) do
         if not activeChars[char] then
             for _, d in pairs(obj) do d:Remove() end
@@ -164,11 +170,12 @@ local function UpdateESP()
     end
 end
 
--- AIMBOT & SILENT AIM
-local function GetClosestPlayer(silent)
+-- FUNÇÃO DO AIMBOT/TRIGGER
+local function GetClosestPlayer(fovOverride)
     local mouse = UserInputService:GetMouseLocation()
     local camPos = Camera.CFrame.Position
-    local best, bestDist = nil, Config.Aimbot.FOV
+    local currentFov = fovOverride or Config.Aimbot.FOV
+    local best, bestDist = nil, currentFov
 
     for char, data in pairs(CachedPlayers) do
         local plr = data.Player
@@ -180,7 +187,8 @@ local function GetClosestPlayer(silent)
                 local params = RaycastParams.new()
                 params.FilterType = Enum.RaycastFilterType.Exclude
                 params.FilterDescendantsInstances = { LocalPlayer.Character, char }
-                if Workspace:Raycast(camPos, part.Position - camPos, params) then continue end
+                -- Usa o oldRaycast para não bugar com o NoSpread
+                if oldRaycast(Workspace, camPos, part.Position - camPos, params) then continue end
             end
 
             local sp = Camera:WorldToViewportPoint(part.Position)
@@ -205,9 +213,8 @@ mt.__index = newcclosure(function(self, key)
         local isKeyDown = Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
         if isKeyDown and self == Mouse then
             if key == "Hit" or key == "Target" then
-                local target = GetClosestPlayer(true)
+                local target = GetClosestPlayer()
                 if target then
-                    -- Prediction de movimento
                     local predictedPos = target.Position + (target.Velocity * Config.Aimbot.Prediction)
                     return (key == "Hit" and CFrame.new(predictedPos) or target)
                 end
@@ -218,12 +225,12 @@ mt.__index = newcclosure(function(self, key)
 end)
 setreadonly(mt, true)
 
--- Camera Lock Aimbot (se Silent estiver desligado)
+-- Camera Lock Aimbot
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function()
     if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
     local isKeyDown = Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
     if isKeyDown then
-        local target = GetClosestPlayer(false)
+        local target = GetClosestPlayer()
         if target then
             local desired = CFrame.lookAt(Camera.CFrame.Position, target.Position)
             Camera.CFrame = Camera.CFrame:Lerp(desired, Config.Aimbot.Smoothness)
@@ -231,15 +238,22 @@ RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100,
     end
 end)
 
--- TRIGGERBOT
+-- TRIGGERBOT CORRIGIDO (Usa mouse1press/mouse1release)
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
+        
+        -- Só atira se estiver segurando o botão esquerdo
         if UserInputService:IsMouseButtonPressed(Config.Triggerbot.Key) then
-            local target = GetClosestPlayer(true)
+            -- FOV bem pequeno (15 pixels) para disparar só quando estiver em cima
+            local target = GetClosestPlayer(Config.Triggerbot.FOV)
             if target then
                 pcall(function()
-                    if mouse1click then mouse1click() end
+                    if mouse1press and mouse1release then
+                        mouse1press()
+                        task.wait(0.01)
+                        mouse1release()
+                    end
                 end)
             end
         end
@@ -269,7 +283,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- UNLOAD
 getgenv().Cobble_Unload = function()
     pcall(function() RunService:UnbindFromRenderStep("CobbleAim") end)
     for _, obj in pairs(espObjects) do for _, d in pairs(obj) do pcall(function() d:Remove() end) end end
@@ -279,6 +292,7 @@ getgenv().Cobble_Unload = function()
         mt.__index = oldIndex
         setreadonly(mt, true)
     end)
+    pcall(function() workspace.Raycast = oldRaycast end) -- Restaura a física normal
     Lighting.Ambient = Color3.fromRGB(70, 70, 70)
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     Lighting.Brightness = 1
