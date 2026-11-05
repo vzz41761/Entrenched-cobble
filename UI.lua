@@ -285,7 +285,8 @@ local function LoadTab(tabName)
 
     if tabName == "Visuals" then
         CreateToggle("ESP Enabled", function() return Config.ESP.Enabled end, function(v) Config.ESP.Enabled = v end)
-        CreateToggle("Box", function() return Config.ESP.Box end, function(v) Config.ESP.Box = v end)
+        CreateToggle("Box 2D", function() return Config.ESP.Box end, function(v) Config.ESP.Box = v end)
+        CreateToggle("Chams 3D (Highlight)", function() return Config.ESP.Chams end, function(v) Config.ESP.Chams = v end)
         CreateToggle("Name", function() return Config.ESP.Name end, function(v) Config.ESP.Name = v end)
         CreateToggle("Distance", function() return Config.ESP.Dist end, function(v) Config.ESP.Dist = v end)
         CreateToggle("Health Bar", function() return Config.ESP.Health end, function(v) Config.ESP.Health = v end)
@@ -305,10 +306,14 @@ local function LoadTab(tabName)
         CreateSlider("Trigger FOV", 2, 30, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
 
     elseif tabName == "Utils" then
-        CreateToggle("No Spread (100%)", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
-        CreateToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
-        CreateSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size end, function(v) Config.Hitbox.Size = v end)
+        CreateToggle("No Spread", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
+        CreateToggle("No Recoil", function() return Config.Util.NoRecoil end, function(v) Config.Util.NoRecoil = v end)
         CreateToggle("Fullbright", function() return Config.Util.Fullbright end, function(v) Config.Util.Fullbright = v end)
+        CreateToggle("Custom Crosshair", function() return Config.Util.Crosshair end, function(v) Config.Util.Crosshair = v end)
+        
+        CreateToggle("FOV Changer", function() return Config.Util.FOVChanger end, function(v) Config.Util.FOVChanger = v end)
+        CreateSlider("Camera FOV", 70, 120, function() return Config.Util.FOVValue end, function(v) Config.Util.FOVValue = v end)
+
         CreateButton("UNLOAD SCRIPT", Color3.fromRGB(255, 80, 80), function()
             if getgenv().Cobble_Unload then getgenv().Cobble_Unload() end
             Gui:Destroy()
