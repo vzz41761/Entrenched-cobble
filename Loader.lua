@@ -1,5 +1,5 @@
 -- cobble hills loader (Entrenched)
-local baseUrl = "https://raw.githubusercontent.com/vzz41761/Entrenched-cobble/main/"
+local baseUrl = "https://raw.githubusercontent.com/vzz41761/Entrenched-cobble/refs/heads/main/"
 
 -- Limpa a versão anterior se já estiver rodando
 if getgenv().Cobble_Unload then 
