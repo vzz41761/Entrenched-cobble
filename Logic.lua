@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED EDITION)
+-- cobble hills logic (ENTRENCHED REAL FIX)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players = game:GetService("Players")
@@ -11,27 +11,10 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 getgenv().CobbleConfig = {
-    ESP = { 
-        Enabled = true, 
-        Box = true, 
-        Name = true, 
-        Dist = true, 
-        Health = true, 
-        TeamCheck = true 
-    },
-    Aimbot = { 
-        Enabled = true, 
-        HoldMode = true, 
-        Key = Enum.UserInputType.MouseButton2, 
-        FOV = 120, 
-        Smoothness = 0.25, 
-        TargetPart = "Head", 
-        WallCheck = true,
-        HitboxExpand = 0 -- 0 = Desligado, valor em studs para expandir
-    },
-    Util = { 
-        Fullbright = false 
-    }
+    ESP = { Enabled = true, Box = true, Name = true, Dist = true, Health = true, TeamCheck = true },
+    Aimbot = { Enabled = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2, FOV = 150, Smoothness = 0.5, TargetPart = "Head", WallCheck = false },
+    Hitbox = { Enabled = false, Size = 10 },
+    Util = { Fullbright = false }
 }
 
 local Config = getgenv().CobbleConfig
@@ -52,11 +35,7 @@ task.spawn(function()
                 local hum = plr.Character:FindFirstChildOfClass("Humanoid")
                 local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hrp and hum.Health > 0 then
-                    temp[plr.Character] = { 
-                        Player = plr, 
-                        Hum = hum, 
-                        Root = hrp 
-                    }
+                    temp[plr.Character] = { Player = plr, Hum = hum, Root = hrp }
                 end
             end
         end
@@ -64,33 +43,51 @@ task.spawn(function()
     end
 end)
 
+-- HITBOX EXPANDER REAL
+RunService.Stepped:Connect(function()
+    if not Config.Hitbox.Enabled then return end
+    
+    for char, data in pairs(CachedPlayers) do
+        local plr = data.Player
+        if Config.ESP.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+        
+        local root = data.Root
+        local head = char:FindFirstChild("Head")
+        
+        if root and root.Size ~= Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size) then
+            root.Size = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
+            root.Transparency = 0.5
+            root.CanCollide = false
+        end
+        
+        if head and head.Size ~= Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size) then
+            head.Size = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
+            head.Transparency = 0.5
+            head.CanCollide = false
+        end
+    end
+end)
+
 -- ESP
 local function UpdateESP()
     if not Config.ESP.Enabled then
-        for _, obj in pairs(espObjects) do
-            for _, d in pairs(obj) do d.Visible = false end
-        end
+        for _, obj in pairs(espObjects) do for _, d in pairs(obj) do d.Visible = false end end
         return
     end
 
     local activeChars = {}
-
     for char, data in pairs(CachedPlayers) do
         local plr = data.Player
         local hum = data.Hum
         local root = data.Root
 
-        -- Team Check
         if Config.ESP.TeamCheck and plr.Team == LocalPlayer.Team then continue end
-
         activeChars[char] = true
 
         if not espObjects[char] then
             espObjects[char] = {
-                box = Drawing.new("Square"),
-                name = Drawing.new("Text"),
-                dist = Drawing.new("Text"),
-                healthBg = Drawing.new("Square"),
+                box = Drawing.new("Square"), name = Drawing.new("Text"),
+                dist = Drawing.new("Text"), healthBg = Drawing.new("Square"),
                 healthFg = Drawing.new("Square")
             }
             espObjects[char].box.Thickness = 1
@@ -119,7 +116,7 @@ local function UpdateESP()
             local bx = topV.X - w * 0.5
 
             obj.box.Visible = Config.ESP.Box
-            obj.box.Color = Color3.fromRGB(255, 50, 50) -- Vermelho para inimigos
+            obj.box.Color = Color3.fromRGB(255, 50, 50)
             obj.box.Position = Vector2.new(bx, topV.Y)
             obj.box.Size = Vector2.new(w, h)
 
@@ -154,7 +151,7 @@ local function UpdateESP()
     end
 end
 
--- AIMBOT
+-- AIMBOT REAL (Camera Lock)
 local function GetTarget()
     local mouse = UserInputService:GetMouseLocation()
     local camPos = Camera.CFrame.Position
@@ -176,9 +173,7 @@ local function GetTarget()
             local sp = Camera:WorldToViewportPoint(part.Position)
             if sp.Z > 0 then
                 local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
-                -- Hitbox Expansion (Matemática)
-                local effectiveFOV = Config.Aimbot.FOV + (Config.Aimbot.HitboxExpand * 10)
-                if d < bestDist or (d < effectiveFOV and d < bestDist + 50) then
+                if d < bestDist then
                     best, bestDist = part, d
                 end
             end
@@ -187,9 +182,20 @@ local function GetTarget()
     return best
 end
 
-RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 1, function()
+-- Prioridade máxima de câmera pra o jogo não sobrescrever
+RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function()
     if not Config.Aimbot.Enabled then return end
-    local isKeyDown = Config.Aimbot.HoldMode and (Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)) or not Config.Aimbot.HoldMode
+    
+    local isKeyDown = false
+    if Config.Aimbot.HoldMode then
+        if Config.Aimbot.Key.EnumType == Enum.KeyCode then
+            isKeyDown = UserInputService:IsKeyDown(Config.Aimbot.Key)
+        elseif Config.Aimbot.Key.EnumType == Enum.UserInputType then
+            isKeyDown = UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
+        end
+    else
+        isKeyDown = true
+    end
 
     if isKeyDown then
         local target = GetTarget()
@@ -202,10 +208,7 @@ end)
 
 RunService.RenderStepped:Connect(function()
     UpdateESP()
-    
-    if Config.Aimbot.Enabled and not Config.Aimbot.HoldMode then
-        fovCircle.Visible = false
-    elseif Config.Aimbot.Enabled and Config.Aimbot.HoldMode then
+    if Config.Aimbot.Enabled and Config.Aimbot.HoldMode then
         fovCircle.Visible = true
         fovCircle.Position = UserInputService:GetMouseLocation()
         fovCircle.Radius = Config.Aimbot.FOV
@@ -213,7 +216,6 @@ RunService.RenderStepped:Connect(function()
         fovCircle.Visible = false
     end
 
-    -- Fullbright
     if Config.Util.Fullbright then
         Lighting.Ambient = Color3.fromRGB(200, 200, 200)
         Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
@@ -223,11 +225,8 @@ end)
 
 getgenv().Cobble_Unload = function()
     pcall(function() RunService:UnbindFromRenderStep("CobbleAim") end)
-    for _, obj in pairs(espObjects) do
-        for _, d in pairs(obj) do pcall(function() d:Remove() end) end
-    end
+    for _, obj in pairs(espObjects) do for _, d in pairs(obj) do pcall(function() d:Remove() end) end end
     pcall(function() fovCircle:Remove() end)
-    -- Restaura o Fullbright
     Lighting.Ambient = Color3.fromRGB(70, 70, 70)
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     Lighting.Brightness = 1
