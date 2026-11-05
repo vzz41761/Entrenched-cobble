@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V3)
+-- cobble hills logic (ENTRENCHED PRO V4)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players = game:GetService("Players")
@@ -159,7 +159,7 @@ local function UpdateESP()
     end
 end
 
--- FUNÇÃO DO AIMBOT/TRIGGER
+-- FUNÇÃO DO AIMBOT/TRIGGER (Usando FindPartOnRay pra evitar erro)
 local function GetClosestPlayer(fovOverride)
     local mouse = UserInputService:GetMouseLocation()
     local camPos = Camera.CFrame.Position
@@ -173,10 +173,11 @@ local function GetClosestPlayer(fovOverride)
         local part = char:FindFirstChild(Config.Aimbot.TargetPart) or char:FindFirstChild("HumanoidRootPart")
         if part then
             if Config.Aimbot.WallCheck then
-                local params = RaycastParams.new()
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                params.FilterDescendantsInstances = { LocalPlayer.Character, char }
-                if Workspace:Raycast(camPos, part.Position - camPos, params) then continue end
+                local ray = Ray.new(camPos, part.Position - camPos)
+                local hitPart, hitPos = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
+                if hitPart and hitPart ~= part and not hitPart:IsDescendantOf(char) then
+                    continue
+                end
             end
 
             local sp = Camera:WorldToViewportPoint(part.Position)
@@ -191,26 +192,13 @@ local function GetClosestPlayer(fovOverride)
     return best
 end
 
--- Hook para No Spread (Hook no ScreenPointToRay)
-local oldRay
-pcall(function()
-    oldRay = Camera.ScreenPointToRay
-    Camera.ScreenPointToRay = function(self, x, y, depth)
-        if Config.Util.NoSpread then
-            -- Força a bala a sair do centro exato da tela
-            local vp = self.ViewportSize
-            return oldRay(self, vp.X / 2, vp.Y / 2, depth)
-        end
-        return oldRay(self, x, y, depth)
-    end
-end)
-
--- Silent Aim Hook
+-- NO SPREAD (Hook Seguro no Metatable da Camera)
 local oldIndex
 local mt = getrawmetatable(game)
 setreadonly(mt, false)
 oldIndex = mt.__index
 mt.__index = newcclosure(function(self, key)
+    -- Hook do Silent Aim
     if Config.Aimbot.Enabled and Config.Aimbot.Silent then
         local isKeyDown = Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
         if isKeyDown and self == Mouse then
@@ -223,11 +211,22 @@ mt.__index = newcclosure(function(self, key)
             end
         end
     end
+    
+    -- Hook do No Spread (Força a bala a sair do centro)
+    if Config.Util.NoSpread and self == Camera then
+        if key == "ScreenPointToRay" then
+            return function(_, x, y, depth)
+                local vp = Camera.ViewportSize
+                return oldIndex(Camera, "ScreenPointToRay")(Camera, vp.X / 2, vp.Y / 2, depth)
+            end
+        end
+    end
+
     return oldIndex(self, key)
 end)
 setreadonly(mt, true)
 
--- Camera Lock Aimbot
+-- Camera Lock Aimbot (Se não for Silent)
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function()
     if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
     local isKeyDown = Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
@@ -244,7 +243,6 @@ end)
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
-        
         if UserInputService:IsMouseButtonPressed(Config.Triggerbot.Key) then
             local target = GetClosestPlayer(Config.Triggerbot.FOV)
             if target then
@@ -289,7 +287,6 @@ getgenv().Cobble_Unload = function()
         mt.__index = oldIndex
         setreadonly(mt, true)
     end)
-    pcall(function() if oldRay then Camera.ScreenPointToRay = oldRay end end)
     Lighting.Ambient = Color3.fromRGB(70, 70, 70)
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     Lighting.Brightness = 1
