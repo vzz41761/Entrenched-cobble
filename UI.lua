@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED REAL FIX)
+-- cobble hills UI (ENTRENCHED PRO)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Config = getgenv().CobbleConfig
@@ -15,21 +15,24 @@ local function Tween(inst, props, time)
 end
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "cobble_entrenched"
+Gui.Name = "cobble_entrenched_pro"
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
 Gui.Parent = pcall(function() return gethui and gethui() end) and gethui() or game:GetService("CoreGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(480, 400)
-Main.Position = UDim2.new(0.5, -240, 0.5, -200)
+Main.Size = UDim2.fromOffset(520, 450)
+Main.Position = UDim2.new(0.5, -260, 0.5, -225)
 Main.BackgroundColor3 = Theme.bg
 Main.BorderSizePixel = 0
 Main.Parent = Gui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+local stroke = Instance.new("UIStroke", Main)
+stroke.Color = Theme.accent
+stroke.Transparency = 0.8
 
 local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 130, 1, 0)
+Sidebar.Size = UDim2.new(0, 140, 1, 0)
 Sidebar.BackgroundColor3 = Theme.sidebar
 Sidebar.Parent = Main
 Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
@@ -51,8 +54,8 @@ TabContainer.Parent = Sidebar
 Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 5)
 
 local ContentContainer = Instance.new("Frame")
-ContentContainer.Size = UDim2.new(1, -150, 1, -20)
-ContentContainer.Position = UDim2.new(0, 140, 0, 10)
+ContentContainer.Size = UDim2.new(1, -160, 1, -20)
+ContentContainer.Position = UDim2.new(0, 150, 0, 10)
 ContentContainer.BackgroundTransparency = 1
 ContentContainer.Parent = Main
 
@@ -65,6 +68,7 @@ Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 Scroll.Parent = ContentContainer
 Instance.new("UIListLayout", Scroll).Padding = UDim.new(0, 8)
 
+-- Funções de Criação de Componentes
 local function MakeTab(text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 35)
@@ -195,6 +199,7 @@ local function MakeSlider(text, min, max, get, set)
     refresh()
 end
 
+-- Abas
 local Tabs = { Visuals = MakeTab("Visuals"), Combat = MakeTab("Combat"), Utils = MakeTab("Utils") }
 
 local function LoadTab(tabName)
@@ -207,14 +212,20 @@ local function LoadTab(tabName)
         MakeToggle("Name", function() return Config.ESP.Name end, function(v) Config.ESP.Name = v end)
         MakeToggle("Distance", function() return Config.ESP.Dist end, function(v) Config.ESP.Dist = v end)
         MakeToggle("Health Bar", function() return Config.ESP.Health end, function(v) Config.ESP.Health = v end)
+        MakeToggle("Tracer", function() return Config.ESP.Tracer end, function(v) Config.ESP.Tracer = v end)
         MakeToggle("Team Check", function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
     elseif tabName == "Combat" then
         MakeToggle("Aimbot Enabled", function() return Config.Aimbot.Enabled end, function(v) Config.Aimbot.Enabled = v end)
+        MakeToggle("Silent Aim", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
         MakeToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
         MakeToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
         
         MakeSlider("FOV", 20, 300, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
         MakeSlider("Smoothness", 0.05, 1, function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
+        MakeSlider("Prediction", 0, 0.5, function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
+
+        MakeToggle("Triggerbot", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
+        MakeSlider("Triggerbot Delay", 0.01, 0.2, function() return Config.Triggerbot.Delay end, function(v) Config.Triggerbot.Delay = v end)
     elseif tabName == "Utils" then
         MakeToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
         MakeSlider("Hitbox Size", 2, 30, function() return Config.Hitbox.Size end, function(v) Config.Hitbox.Size = v end)
@@ -232,6 +243,7 @@ Tabs.Combat.MouseButton1Click:Connect(function() LoadTab("Combat") end)
 Tabs.Utils.MouseButton1Click:Connect(function() LoadTab("Utils") end)
 LoadTab("Visuals")
 
+-- Keybind para mostrar/esconder o menu (RightShift)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then Gui.Enabled = not Gui.Enabled end
