@@ -1,11 +1,11 @@
--- cobble hills logic (ENTRENCHED PRO V8 - MAGIC BULLET)
+-- cobble hills logic (ENTRENCHED PRO V9 - BALLISTIC ENGINE)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Lighting         = game:GetService("Lighting")
 local Workspace        = game:GetService("Workspace")
+local Lighting         = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera      = Workspace.CurrentCamera
@@ -14,10 +14,10 @@ local Mouse       = LocalPlayer:GetMouse()
 getgenv().CobbleConfig = {
     ESP      = { Enabled = true,  Box = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
     Aimbot   = { Enabled = true,  Silent = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2,
-                 FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 },
+                 FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = true },
     Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
     Hitbox   = { Enabled = false, Size = 6, Transparency = 0.5 },
-    Util     = { Fullbright = false, NoSpread = true, VisualTracer = true } -- NOVO: Tracer Visual
+    Util     = { Fullbright = false, NoSpread = true }
 }
 
 local Config        = getgenv().CobbleConfig
@@ -26,12 +26,9 @@ local espObjects    = {}
 local fovCircle     = Drawing.new("Circle")
 local CurrentTarget = nil
 
--- NOVO: Desenho da linha da bala (Magic Bullet)
-local BulletTracer = Drawing.new("Line")
-BulletTracer.Thickness = 2
-BulletTracer.Color = Color3.fromRGB(255, 255, 0)
-BulletTracer.Transparency = 1
-BulletTracer.Visible = false
+-- Configurações de balística (baseadas no Roblox padrão)
+local ProjectileGravity = Workspace.Gravity -- Valor padrão do Roblox
+local ProjectileSpeed   = 1000 -- Valor base, será atualizado se o módulo da arma for lido
 
 fovCircle.Thickness = 1.5
 fovCircle.NumSides  = 60
@@ -54,6 +51,42 @@ task.spawn(function()
     end
 end)
 
+-- ============================================================
+-- MÓDULO DE REMOÇÃO DE SPREAD (A SOLUÇÃO REAL)
+-- ============================================================
+task.spawn(function()
+    while task.wait(1) do
+        if not Config.Util.NoSpread then continue end
+        
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if not backpack then continue end
+        
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                local gunStates = tool:FindFirstChild("GunStates")
+                if gunStates then
+                    pcall(function()
+                        local states = require(gunStates)
+                        -- Zera todas as propriedades relacionadas ao espalhamento
+                        states["Spread"] = 0
+                        states["MinSpread"] = 0
+                        states["MaxSpread"] = 0
+                        states["SpreadIncrease"] = 0
+                        
+                        -- Tenta atualizar a velocidade do projétil para o preditor
+                        if states["Velocity"] then
+                            ProjectileSpeed = states["Velocity"]
+                        end
+                        if states["Gravity"] then
+                            ProjectileGravity = states["Gravity"]
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end)
+
 -- HITBOX EXPANDER
 task.spawn(function()
     while task.wait(0.1) do
@@ -73,7 +106,31 @@ task.spawn(function()
     end
 end)
 
--- FUNÇÃO PRA ACHAR O ALVO
+-- ============================================================
+-- LÓGICA DE ALVO E PREDIÇÃO BALÍSTICA
+-- ============================================================
+local function CalculateBallisticPosition(targetPart)
+    if not Config.Aimbot.Prediction then return targetPart.Position end
+    
+    local camPos = Camera.CFrame.Position
+    local targetPos = targetPart.Position
+    local targetVel = targetPart.AssemblyLinearVelocity
+    
+    -- Resolve o tempo de voo usando a fórmula da balística
+    -- t = distância / velocidade_do_projétil (aproximação iterativa)
+    local dist = (targetPos - camPos).Magnitude
+    local timeToTarget = dist / ProjectileSpeed
+    
+    -- Prever posição futura com base na velocidade do alvo
+    local predictedPos = targetPos + (targetVel * timeToTarget)
+    
+    -- Compensar a queda do projétil (bullet drop) devido à gravidade
+    local dropOffset = 0.5 * ProjectileGravity * (timeToTarget ^ 2)
+    predictedPos = predictedPos + Vector3.new(0, dropOffset, 0)
+    
+    return predictedPos
+end
+
 local function GetClosestPlayer(fovOverride)
     local mouse      = UserInputService:GetMouseLocation()
     local camPos     = Camera.CFrame.Position
@@ -86,21 +143,21 @@ local function GetClosestPlayer(fovOverride)
 
         local part = char:FindFirstChild(Config.Aimbot.TargetPart) or char:FindFirstChild("HumanoidRootPart")
         if part then
+            if Config.Aimbot.WallCheck then
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {LocalPlayer.Character}
+                params.FilterType = Enum.RaycastFilterType.Exclude
+                local result = Workspace:Raycast(camPos, part.Position - camPos, params)
+                if result and result.Instance and not result.Instance:IsDescendantOf(char) then
+                    continue
+                end
+            end
+
             local sp = Camera:WorldToViewportPoint(part.Position)
             if sp.Z > 0 then
                 local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
                 if d < bestDist then 
-                    if Config.Aimbot.WallCheck then
-                        local params = RaycastParams.new()
-                        params.FilterDescendantsInstances = {LocalPlayer.Character}
-                        params.FilterType = Enum.RaycastFilterType.Exclude
-                        local result = Workspace:Raycast(camPos, part.Position - camPos, params)
-                        if not (result and result.Instance and not result.Instance:IsDescendantOf(char)) then
-                            best, bestDist = part, d
-                        end
-                    else
-                        best, bestDist = part, d
-                    end
+                    best, bestDist = part, d
                 end
             end
         end
@@ -108,7 +165,7 @@ local function GetClosestPlayer(fovOverride)
     return best
 end
 
--- Atualiza o alvo 60 vezes por segundo
+-- Atualiza o CurrentTarget 60 vezes por segundo
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot.Enabled then
         CurrentTarget = GetClosestPlayer()
@@ -117,7 +174,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP
+-- ESP (mantido igual)
 local function UpdateESP()
     if not Config.ESP.Enabled then
         for _, obj in pairs(espObjects) do for _, d in pairs(obj) do d.Visible = false end end
@@ -202,74 +259,41 @@ local function UpdateESP()
     end
 end
 
--- HOOK DA CÂMERA (A MÁGICA DO NO SPREAD E SILENT AIM)
+-- ============================================================
+-- HOOKS DE SILENT AIM (AGORA COM BALÍSTICA)
+-- ============================================================
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
-    -- 1. Silent Aim do Mouse
     if self == Mouse and (key == "Hit" or key == "Target") then
         local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
             and UserInputService:IsKeyDown(Config.Aimbot.Key)
             or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
         if Config.Aimbot.Enabled and Config.Aimbot.Silent and isDown and CurrentTarget then
-            local predicted = CurrentTarget.Position + (CurrentTarget.AssemblyLinearVelocity * Config.Aimbot.Prediction)
-            return key == "Hit" and CFrame.new(predicted) or CurrentTarget
+            local ballisticPos = CalculateBallisticPosition(CurrentTarget)
+            return key == "Hit" and CFrame.new(ballisticPos) or CurrentTarget
         end
     end
     
-    -- 2. No Spread e Aimbot no ScreenPointToRay (O segredo do FPS)
+    -- No Spread residual (não deve ser necessário, mas mantém como fallback)
     if Config.Util.NoSpread and self == Camera and key == "ScreenPointToRay" then
         return function(_, x, y, depth)
-            local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
-                and UserInputService:IsKeyDown(Config.Aimbot.Key)
-                or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
-                
-            -- Se estiver com aimbot ativo, a bala sai da câmera direto pro alvo
-            if Config.Aimbot.Enabled and CurrentTarget and (isDown or not Config.Aimbot.HoldMode) then
-                local predicted = CurrentTarget.Position + (CurrentTarget.AssemblyLinearVelocity * Config.Aimbot.Prediction)
-                -- Retorna um Ray perfeito do centro da câmera até o alvo
-                return Ray.new(Camera.CFrame.Position, (predicted - Camera.CFrame.Position).Unit * (depth or 1000))
-            else
-                -- Se não tiver aimbot, retorna a função original mas forçando o centro da tela (tira o spread)
-                local vp = Camera.ViewportSize
-                return oldIndex(Camera, "ScreenPointToRay")(Camera, vp.X / 2, vp.Y / 2, depth)
-            end
+            local vp = Camera.ViewportSize
+            return oldIndex(Camera, "ScreenPointToRay")(Camera, vp.X / 2, vp.Y / 2, depth)
         end
     end
 
     return oldIndex(self, key)
 end)
 
--- CAMERA LOCK AIMBOT (Visual)
-RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function(dt)
-    if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
-    local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
-        and UserInputService:IsKeyDown(Config.Aimbot.Key)
-        or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
-    if isDown and CurrentTarget then
-        local desired = CFrame.lookAt(Camera.CFrame.Position, CurrentTarget.Position)
-        local alpha = 1 - (1 - Config.Aimbot.Smoothness)^(dt * 60)
-        Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
-    end
-end)
-
--- TRIGGERBOT & VISUAL TRACER
+-- ============================================================
+-- TRIGGERBOT
+-- ============================================================
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
         local target = GetClosestPlayer(Config.Triggerbot.FOV)
         if target then
             pcall(function()
-                -- Desenha o tracer visual amarelo
-                if Config.Util.VisualTracer then
-                    local sp = Camera:WorldToViewportPoint(target.Position)
-                    if sp.Z > 0 then
-                        BulletTracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                        BulletTracer.To = Vector2.new(sp.X, sp.Y)
-                        BulletTracer.Visible = true
-                        task.delay(0.1, function() BulletTracer.Visible = false end)
-                    end
-                end
-                
                 if mouse1click then
                     mouse1click()
                 elseif game:GetService("VirtualUser") then
@@ -283,6 +307,20 @@ task.spawn(function()
                 end
             end)
         end
+    end
+end)
+
+-- CAMERA LOCK AIMBOT
+RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function(dt)
+    if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
+    local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
+        and UserInputService:IsKeyDown(Config.Aimbot.Key)
+        or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
+    if isDown and CurrentTarget then
+        local ballisticPos = CalculateBallisticPosition(CurrentTarget)
+        local desired = CFrame.lookAt(Camera.CFrame.Position, ballisticPos)
+        local alpha = 1 - (1 - Config.Aimbot.Smoothness)^(dt * 60)
+        Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
     end
 end)
 
@@ -316,7 +354,6 @@ getgenv().Cobble_Unload = function()
         for _, d in pairs(obj) do pcall(function() d:Remove() end) end
     end
     pcall(function() fovCircle:Remove() end)
-    pcall(function() BulletTracer:Remove() end)
     pcall(function()
         if hookmetamethod then
             local mt = getrawmetatable(game)
