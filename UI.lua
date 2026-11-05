@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED PRO V5 — fixed)
+-- cobble hills UI (ENTRENCHED PRO V6)
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local Config           = getgenv().CobbleConfig
@@ -21,8 +21,6 @@ local Gui = Instance.new("ScreenGui")
 Gui.Name           = "cobble_entrenched_pro"
 Gui.ResetOnSpawn   = false
 Gui.IgnoreGuiInset = true
-
--- FIX: pcall correto — original chamava gethui() duas vezes, crashava se nil
 local ok, hui = pcall(function() return gethui and gethui() end)
 Gui.Parent = (ok and hui) or game:GetService("CoreGui")
 
@@ -73,7 +71,6 @@ Scroll.ScrollBarImageColor3  = Theme.accent
 Scroll.CanvasSize            = UDim2.new(0, 0, 0, 0)
 Scroll.Parent                = ContentContainer
 
--- FIX CRÍTICO: CanvasSize dinâmico — sem isso o conteúdo clipa e some no scroll
 local ScrollLayout = Instance.new("UIListLayout", Scroll)
 ScrollLayout.Padding = UDim.new(0, 8)
 ScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -172,7 +169,6 @@ local function MakeSlider(text, min, max, get, set)
     label.TextXAlignment     = Enum.TextXAlignment.Left
     label.Parent             = holder
 
-    -- FIX: era UDim2.new(50, 0, ...) = 5000% de largura do pai
     local valText = Instance.new("TextLabel")
     valText.Size             = UDim2.fromOffset(50, 15)
     valText.Position         = UDim2.new(1, -50, 0, 0)
@@ -197,10 +193,10 @@ local function MakeSlider(text, min, max, get, set)
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
     local function refresh()
-        local v = get()
+        -- PROTEÇÃO EXTREMA: Se por algum motivo vier boolean, converte pra número
+        local v = tonumber(get()) or min
         local a = math.clamp((v - min) / (max - min), 0, 1)
         fill.Size = UDim2.new(a, 0, 1, 0)
-        -- FIX: float com tostring() gerava "0.30000000001" etc.
         valText.Text = (math.floor(v) == v) and tostring(math.floor(v)) or string.format("%.2f", v)
     end
 
@@ -223,8 +219,6 @@ local function MakeSlider(text, min, max, get, set)
     refresh()
 end
 
--- FIX: BoneSelector sincroniza idx com o valor atual ao criar o botão
--- original sempre começava em idx=1; primeiro clique ia para bones[2] independente da config
 local function MakeBoneSelector(text, get, set)
     local btn = Instance.new("TextButton")
     btn.Size             = UDim2.new(1, 0, 0, 35)
@@ -232,7 +226,7 @@ local function MakeBoneSelector(text, get, set)
     btn.Font             = Enum.Font.Gotham
     btn.TextColor3       = Theme.text
     btn.TextSize         = 13
-    btn.Text             = text .. ": " .. get()
+    btn.Text             = text .. ": " .. tostring(get())
     btn.Parent           = Scroll
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
@@ -245,7 +239,7 @@ local function MakeBoneSelector(text, get, set)
     btn.MouseButton1Click:Connect(function()
         idx = idx % #bones + 1
         set(bones[idx])
-        btn.Text = text .. ": " .. get()
+        btn.Text = text .. ": " .. tostring(get())
     end)
 end
 
