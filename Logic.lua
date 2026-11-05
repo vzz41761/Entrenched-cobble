@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V4)
+-- cobble hills logic (ENTRENCHED PRO V5)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players = game:GetService("Players")
@@ -6,7 +6,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
-local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -15,7 +14,7 @@ local Mouse = LocalPlayer:GetMouse()
 getgenv().CobbleConfig = {
     ESP = { Enabled = true, Box = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
     Aimbot = { Enabled = true, Silent = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2, FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 },
-    Triggerbot = { Enabled = false, Key = Enum.UserInputType.MouseButton1, Delay = 0.05, FOV = 15 },
+    Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 }, -- Atira sozinho
     Hitbox = { Enabled = false, Size = 10, Transparency = 0.5 },
     Util = { Fullbright = false, NoSpread = true }
 }
@@ -46,24 +45,24 @@ task.spawn(function()
     end
 end)
 
--- HITBOX EXPANDER
-task.spawn(function()
-    while task.wait(1) do
-        if not Config.Hitbox.Enabled then continue end
-        for char, data in pairs(CachedPlayers) do
-            if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
-            local root = data.Root
-            local head = char:FindFirstChild("Head")
-            if root and root.Size ~= Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size) then
-                root.Size = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
-                root.Transparency = Config.Hitbox.Transparency
-                root.CanCollide = false
-            end
-            if head and head.Size ~= Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size) then
-                head.Size = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
-                head.Transparency = Config.Hitbox.Transparency
-                head.CanCollide = false
-            end
+-- HITBOX EXPANDER (Frame a Frame para não resetar)
+RunService.Stepped:Connect(function()
+    if not Config.Hitbox.Enabled then return end
+    for char, data in pairs(CachedPlayers) do
+        if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
+        local root = data.Root
+        local head = char:FindFirstChild("Head")
+        local targetSize = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
+        
+        if root and root.Size ~= targetSize then
+            root.Size = targetSize
+            root.Transparency = Config.Hitbox.Transparency
+            root.CanCollide = false
+        end
+        if head and head.Size ~= targetSize then
+            head.Size = targetSize
+            head.Transparency = Config.Hitbox.Transparency
+            head.CanCollide = false
         end
     end
 end)
@@ -159,7 +158,7 @@ local function UpdateESP()
     end
 end
 
--- FUNÇÃO DO AIMBOT/TRIGGER (Usando FindPartOnRay pra evitar erro)
+-- FUNÇÃO DO AIMBOT
 local function GetClosestPlayer(fovOverride)
     local mouse = UserInputService:GetMouseLocation()
     local camPos = Camera.CFrame.Position
@@ -174,7 +173,7 @@ local function GetClosestPlayer(fovOverride)
         if part then
             if Config.Aimbot.WallCheck then
                 local ray = Ray.new(camPos, part.Position - camPos)
-                local hitPart, hitPos = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
+                local hitPart = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
                 if hitPart and hitPart ~= part and not hitPart:IsDescendantOf(char) then
                     continue
                 end
@@ -192,39 +191,56 @@ local function GetClosestPlayer(fovOverride)
     return best
 end
 
--- NO SPREAD (Hook Seguro no Metatable da Camera)
-local oldIndex
-local mt = getrawmetatable(game)
-setreadonly(mt, false)
-oldIndex = mt.__index
-mt.__index = newcclosure(function(self, key)
-    -- Hook do Silent Aim
-    if Config.Aimbot.Enabled and Config.Aimbot.Silent then
+-- HOOK DO SILENT AIM E NO SPREAD (Namecall)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    
+    -- Silent Aim
+    if Config.Aimbot.Enabled and Config.Aimbot.Silent and self == Mouse then
         local isKeyDown = Config.Aimbot.Key.EnumType == Enum.KeyCode and UserInputService:IsKeyDown(Config.Aimbot.Key) or UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
-        if isKeyDown and self == Mouse then
-            if key == "Hit" or key == "Target" then
+        if isKeyDown then
+            if method == "GetMouse" or method == "get" then
+                -- Fallback, mas o hook abaixo pega direto
+            elseif method == "Hit" or method == "Target" then
                 local target = GetClosestPlayer()
                 if target then
                     local predictedPos = target.Position + (target.Velocity * Config.Aimbot.Prediction)
-                    return (key == "Hit" and CFrame.new(predictedPos) or target)
+                    return (method == "Hit" and CFrame.new(predictedPos) or target)
                 end
             end
         end
     end
-    
-    -- Hook do No Spread (Força a bala a sair do centro)
-    if Config.Util.NoSpread and self == Camera then
-        if key == "ScreenPointToRay" then
-            return function(_, x, y, depth)
-                local vp = Camera.ViewportSize
-                return oldIndex(Camera, "ScreenPointToRay")(Camera, vp.X / 2, vp.Y / 2, depth)
+
+    -- No Spread (Hook no Raycast do jogo)
+    if Config.Util.NoSpread and (method == "Raycast" or method == "FindPartOnRay") then
+        local args = {...}
+        if method == "Raycast" then
+            local origin, direction, params = args[1], args[2], args[3]
+            -- Força a direção a ser o centro da tela (ou o alvo do Silent Aim)
+            local target = Config.Aimbot.Enabled and GetClosestPlayer()
+            if target then
+                direction = (target.Position - origin).Unit * direction.Magnitude
+            else
+                local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                direction = unitRay.Direction * direction.Magnitude
             end
+            return oldNamecall(self, origin, direction, params)
+        elseif method == "FindPartOnRay" then
+            local ray, ignore = args[1], args[2]
+            local target = Config.Aimbot.Enabled and GetClosestPlayer()
+            if target then
+                ray = Ray.new(ray.Origin, (target.Position - ray.Origin).Unit * ray.Direction.Magnitude)
+            else
+                local unitRay = Camera:ScreenPointToRay(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                ray = Ray.new(ray.Origin, unitRay.Direction * ray.Direction.Magnitude)
+            end
+            return oldNamecall(self, ray, ignore)
         end
     end
 
-    return oldIndex(self, key)
+    return oldNamecall(self, ...)
 end)
-setreadonly(mt, true)
 
 -- Camera Lock Aimbot (Se não for Silent)
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function()
@@ -239,18 +255,19 @@ RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100,
     end
 end)
 
--- TRIGGERBOT REAL (VirtualUser)
+-- TRIGGERBOT (Atira sozinho)
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
-        if UserInputService:IsMouseButtonPressed(Config.Triggerbot.Key) then
-            local target = GetClosestPlayer(Config.Triggerbot.FOV)
-            if target then
-                pcall(function()
-                    VirtualUser:CaptureController()
-                    VirtualUser:ClickButton1(Vector2.new(0, 0))
-                end)
-            end
+        
+        -- Ele não checa mais se você tá segurando o mouse, ele simplesmente atira se o inimigo passar no FOV
+        local target = GetClosestPlayer(Config.Triggerbot.FOV)
+        if target then
+            pcall(function()
+                local VirtualUser = game:GetService("VirtualUser")
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton1(Vector2.new(0, 0))
+            end)
         end
     end
 end)
@@ -283,9 +300,12 @@ getgenv().Cobble_Unload = function()
     for _, obj in pairs(espObjects) do for _, d in pairs(obj) do pcall(function() d:Remove() end) end end
     pcall(function() fovCircle:Remove() end)
     pcall(function()
-        setreadonly(mt, false)
-        mt.__index = oldIndex
-        setreadonly(mt, true)
+        if hookmetamethod and oldNamecall then
+            local mt = getrawmetatable(game)
+            setreadonly(mt, false)
+            mt.__namecall = oldNamecall
+            setreadonly(mt, true)
+        end
     end)
     Lighting.Ambient = Color3.fromRGB(70, 70, 70)
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
