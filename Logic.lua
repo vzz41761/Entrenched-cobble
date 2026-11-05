@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V7)
+-- cobble hills logic (ENTRENCHED PRO V8 - MAGIC BULLET)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players          = game:GetService("Players")
@@ -17,14 +17,21 @@ getgenv().CobbleConfig = {
                  FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 },
     Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
     Hitbox   = { Enabled = false, Size = 6, Transparency = 0.5 },
-    Util     = { Fullbright = false, NoSpread = true }
+    Util     = { Fullbright = false, NoSpread = true, VisualTracer = true } -- NOVO: Tracer Visual
 }
 
 local Config        = getgenv().CobbleConfig
 local CachedPlayers = {}
 local espObjects    = {}
 local fovCircle     = Drawing.new("Circle")
-local CurrentTarget = nil -- Cache do alvo atual (Evita crashes)
+local CurrentTarget = nil
+
+-- NOVO: Desenho da linha da bala (Magic Bullet)
+local BulletTracer = Drawing.new("Line")
+BulletTracer.Thickness = 2
+BulletTracer.Color = Color3.fromRGB(255, 255, 0)
+BulletTracer.Transparency = 1
+BulletTracer.Visible = false
 
 fovCircle.Thickness = 1.5
 fovCircle.NumSides  = 60
@@ -66,7 +73,7 @@ task.spawn(function()
     end
 end)
 
--- LÓGICA DO ALVO (Roda em segundo plano para não sobrecarregar os hooks)
+-- FUNÇÃO PRA ACHAR O ALVO
 local function GetClosestPlayer(fovOverride)
     local mouse      = UserInputService:GetMouseLocation()
     local camPos     = Camera.CFrame.Position
@@ -83,7 +90,6 @@ local function GetClosestPlayer(fovOverride)
             if sp.Z > 0 then
                 local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
                 if d < bestDist then 
-                    -- O WallCheck só roda no candidato mais próximo para economizar processamento
                     if Config.Aimbot.WallCheck then
                         local params = RaycastParams.new()
                         params.FilterDescendantsInstances = {LocalPlayer.Character}
@@ -102,14 +108,12 @@ local function GetClosestPlayer(fovOverride)
     return best
 end
 
--- Atualiza o CurrentTarget 30 vezes por segundo (Fim do crash)
-task.spawn(function()
-    while task.wait(0.03) do
-        if Config.Aimbot.Enabled then
-            CurrentTarget = GetClosestPlayer()
-        else
-            CurrentTarget = nil
-        end
+-- Atualiza o alvo 60 vezes por segundo
+RunService.RenderStepped:Connect(function()
+    if Config.Aimbot.Enabled then
+        CurrentTarget = GetClosestPlayer()
+    else
+        CurrentTarget = nil
     end
 end)
 
@@ -198,9 +202,10 @@ local function UpdateESP()
     end
 end
 
--- SILENT AIM (Hook Index usando Cache)
+-- HOOK DA CÂMERA (A MÁGICA DO NO SPREAD E SILENT AIM)
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
+    -- 1. Silent Aim do Mouse
     if self == Mouse and (key == "Hit" or key == "Target") then
         local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
             and UserInputService:IsKeyDown(Config.Aimbot.Key)
@@ -210,31 +215,31 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
             return key == "Hit" and CFrame.new(predicted) or CurrentTarget
         end
     end
+    
+    -- 2. No Spread e Aimbot no ScreenPointToRay (O segredo do FPS)
+    if Config.Util.NoSpread and self == Camera and key == "ScreenPointToRay" then
+        return function(_, x, y, depth)
+            local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
+                and UserInputService:IsKeyDown(Config.Aimbot.Key)
+                or  UserInputService:IsMouseButtonPressed(Config.Aimbot.Key)
+                
+            -- Se estiver com aimbot ativo, a bala sai da câmera direto pro alvo
+            if Config.Aimbot.Enabled and CurrentTarget and (isDown or not Config.Aimbot.HoldMode) then
+                local predicted = CurrentTarget.Position + (CurrentTarget.AssemblyLinearVelocity * Config.Aimbot.Prediction)
+                -- Retorna um Ray perfeito do centro da câmera até o alvo
+                return Ray.new(Camera.CFrame.Position, (predicted - Camera.CFrame.Position).Unit * (depth or 1000))
+            else
+                -- Se não tiver aimbot, retorna a função original mas forçando o centro da tela (tira o spread)
+                local vp = Camera.ViewportSize
+                return oldIndex(Camera, "ScreenPointToRay")(Camera, vp.X / 2, vp.Y / 2, depth)
+            end
+        end
+    end
+
     return oldIndex(self, key)
 end)
 
--- NO SPREAD (Hook Namecall usando Cache)
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    
-    if Config.Util.NoSpread and (method == "Raycast" or method == "FindPartOnRay") then
-        local args = {...}
-        if method == "Raycast" then
-            local origin, direction, params = args[1], args[2], args[3]
-            -- Se tiver alvo, puxa pro alvo. Se não, força a ir reto na câmera.
-            local targetDir = CurrentTarget and (CurrentTarget.Position - origin).Unit or Camera.CFrame.LookVector
-            return oldNamecall(self, origin, targetDir * direction.Magnitude, params)
-        elseif method == "FindPartOnRay" then
-            local ray, ignore = args[1], args[2]
-            local targetDir = CurrentTarget and (CurrentTarget.Position - ray.Origin).Unit or Camera.CFrame.LookVector
-            return oldNamecall(self, Ray.new(ray.Origin, targetDir * ray.Direction.Magnitude), ignore)
-        end
-    end
-    return oldNamecall(self, ...)
-end)
-
--- CAMERA LOCK AIMBOT (Usando Cache)
+-- CAMERA LOCK AIMBOT (Visual)
 RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100, function(dt)
     if not Config.Aimbot.Enabled or Config.Aimbot.Silent then return end
     local isDown = Config.Aimbot.Key.EnumType == Enum.KeyCode
@@ -247,13 +252,24 @@ RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100,
     end
 end)
 
--- TRIGGERBOT (Agressivo com Fallbacks)
+-- TRIGGERBOT & VISUAL TRACER
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
         local target = GetClosestPlayer(Config.Triggerbot.FOV)
         if target then
             pcall(function()
+                -- Desenha o tracer visual amarelo
+                if Config.Util.VisualTracer then
+                    local sp = Camera:WorldToViewportPoint(target.Position)
+                    if sp.Z > 0 then
+                        BulletTracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        BulletTracer.To = Vector2.new(sp.X, sp.Y)
+                        BulletTracer.Visible = true
+                        task.delay(0.1, function() BulletTracer.Visible = false end)
+                    end
+                end
+                
                 if mouse1click then
                     mouse1click()
                 elseif game:GetService("VirtualUser") then
@@ -300,12 +316,12 @@ getgenv().Cobble_Unload = function()
         for _, d in pairs(obj) do pcall(function() d:Remove() end) end
     end
     pcall(function() fovCircle:Remove() end)
+    pcall(function() BulletTracer:Remove() end)
     pcall(function()
         if hookmetamethod then
             local mt = getrawmetatable(game)
             setreadonly(mt, false)
-            if oldNamecall then mt.__namecall = oldNamecall end
-            if oldIndex    then mt.__index    = oldIndex    end
+            if oldIndex then mt.__index = oldIndex end
             setreadonly(mt, true)
         end
     end)
