@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED PRO V3)
+-- cobble hills UI (ENTRENCHED PRO V5)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Config = getgenv().CobbleConfig
@@ -198,6 +198,29 @@ local function MakeSlider(text, min, max, get, set)
     refresh()
 end
 
+-- NOVO BOTÃO DE SELECIONAR O OSSO
+local function MakeBoneSelector(text, get, set)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = Theme.surface
+    btn.Font = Enum.Font.Gotham
+    btn.TextColor3 = Theme.text
+    btn.TextSize = 13
+    btn.Text = text .. ": " .. get()
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local bones = {"Head", "Torso", "HumanoidRootPart", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
+    local idx = 1
+    
+    btn.MouseButton1Click:Connect(function()
+        idx = idx + 1
+        if idx > #bones then idx = 1 end
+        set(bones[idx])
+        btn.Text = text .. ": " .. get()
+    end)
+end
+
 local Tabs = { Visuals = MakeTab("Visuals"), Combat = MakeTab("Combat"), Utils = MakeTab("Utils") }
 
 local function LoadTab(tabName)
@@ -214,17 +237,18 @@ local function LoadTab(tabName)
         MakeToggle("Team Check", function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
     elseif tabName == "Combat" then
         MakeToggle("Aimbot Enabled", function() return Config.Aimbot.Enabled end, function(v) Config.Aimbot.Enabled = v end)
-        MakeToggle("Silent Aim (Magic)", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
+        MakeToggle("Silent Aim", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
         MakeToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
         MakeToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
+        
+        MakeBoneSelector("Target Bone", function() return Config.Aimbot.TargetPart end, function(v) Config.Aimbot.TargetPart = v end)
         
         MakeSlider("FOV", 20, 300, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
         MakeSlider("Smoothness", 0.05, 1, function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
         MakeSlider("Prediction", 0, 0.5, function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
 
-        MakeToggle("Triggerbot", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
-        MakeSlider("Trigger FOV", 5, 50, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
-        MakeSlider("Trigger Delay", 0.01, 0.2, function() return Config.Triggerbot.Delay end, function(v) Config.Triggerbot.Delay = v end)
+        MakeToggle("Triggerbot (Auto-Fire)", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
+        MakeSlider("Trigger FOV", 2, 30, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
     elseif tabName == "Utils" then
         MakeToggle("No Spread (100%)", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
         MakeToggle("Hitbox Expander", function() return Config.Hitbox.Enabled end, function(v) Config.Hitbox.Enabled = v end)
