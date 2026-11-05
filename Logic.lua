@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V9 - BALLISTIC ENGINE)
+-- cobble hills logic (ENTRENCHED PRO V10 - TRUE FIX)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players          = game:GetService("Players")
@@ -14,7 +14,7 @@ local Mouse       = LocalPlayer:GetMouse()
 getgenv().CobbleConfig = {
     ESP      = { Enabled = true,  Box = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
     Aimbot   = { Enabled = true,  Silent = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2,
-                 FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = true },
+                 FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 }, -- CORRIGIDO: Número
     Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
     Hitbox   = { Enabled = false, Size = 6, Transparency = 0.5 },
     Util     = { Fullbright = false, NoSpread = true }
@@ -26,9 +26,9 @@ local espObjects    = {}
 local fovCircle     = Drawing.new("Circle")
 local CurrentTarget = nil
 
--- Configurações de balística (baseadas no Roblox padrão)
-local ProjectileGravity = Workspace.Gravity -- Valor padrão do Roblox
-local ProjectileSpeed   = 1000 -- Valor base, será atualizado se o módulo da arma for lido
+-- Configurações de balística
+local ProjectileGravity = Workspace.Gravity 
+local ProjectileSpeed   = 1000 
 
 fovCircle.Thickness = 1.5
 fovCircle.NumSides  = 60
@@ -51,39 +51,32 @@ task.spawn(function()
     end
 end)
 
--- ============================================================
--- MÓDULO DE REMOÇÃO DE SPREAD (A SOLUÇÃO REAL)
--- ============================================================
+-- REMOÇÃO DE SPREAD (Agora checa Character e Backpack)
 task.spawn(function()
     while task.wait(1) do
         if not Config.Util.NoSpread then continue end
         
-        local backpack = LocalPlayer:FindFirstChild("Backpack")
-        if not backpack then continue end
-        
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") then
-                local gunStates = tool:FindFirstChild("GunStates")
-                if gunStates then
-                    pcall(function()
-                        local states = require(gunStates)
-                        -- Zera todas as propriedades relacionadas ao espalhamento
-                        states["Spread"] = 0
-                        states["MinSpread"] = 0
-                        states["MaxSpread"] = 0
-                        states["SpreadIncrease"] = 0
-                        
-                        -- Tenta atualizar a velocidade do projétil para o preditor
-                        if states["Velocity"] then
-                            ProjectileSpeed = states["Velocity"]
-                        end
-                        if states["Gravity"] then
-                            ProjectileGravity = states["Gravity"]
-                        end
-                    end)
+        local function checkTools(container)
+            if not container then return end
+            for _, tool in ipairs(container:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local gunStates = tool:FindFirstChild("GunStates")
+                    if gunStates then
+                        pcall(function()
+                            local states = require(gunStates)
+                            states["Spread"] = 0
+                            states["MinSpread"] = 0
+                            states["MaxSpread"] = 0
+                            states["SpreadIncrease"] = 0
+                            if states["Velocity"] then ProjectileSpeed = states["Velocity"] end
+                            if states["Gravity"] then ProjectileGravity = states["Gravity"] end
+                        end)
+                    end
                 end
             end
         end
+        checkTools(LocalPlayer:FindFirstChild("Character"))
+        checkTools(LocalPlayer:FindFirstChild("Backpack"))
     end
 end)
 
@@ -106,53 +99,46 @@ task.spawn(function()
     end
 end)
 
--- ============================================================
--- LÓGICA DE ALVO E PREDIÇÃO BALÍSTICA
--- ============================================================
+-- BALÍSTICA CORRIGIDA
 local function CalculateBallisticPosition(targetPart)
-    if not Config.Aimbot.Prediction then return targetPart.Position end
+    -- Se o prediction for 0 ou menor, retorna a posição exata
+    if not Config.Aimbot.Prediction or Config.Aimbot.Prediction <= 0 then 
+        return targetPart.Position 
+    end
     
     local camPos = Camera.CFrame.Position
     local targetPos = targetPart.Position
     local targetVel = targetPart.AssemblyLinearVelocity
     
-    -- Resolve o tempo de voo usando a fórmula da balística
-    -- t = distância / velocidade_do_projétil (aproximação iterativa)
     local dist = (targetPos - camPos).Magnitude
     local timeToTarget = dist / ProjectileSpeed
     
-    -- Prever posição futura com base na velocidade do alvo
-    local predictedPos = targetPos + (targetVel * timeToTarget)
+    -- Agora usa o valor do slider como um multiplicador real
+    local predictionMult = Config.Aimbot.Prediction
     
-    -- Compensar a queda do projétil (bullet drop) devido à gravidade
+    local predictedPos = targetPos + (targetVel * timeToTarget * predictionMult)
+    
+    -- Adiciona a queda da bala (bullet drop)
     local dropOffset = 0.5 * ProjectileGravity * (timeToTarget ^ 2)
     predictedPos = predictedPos + Vector3.new(0, dropOffset, 0)
     
     return predictedPos
 end
 
+-- OTIMIZAÇÃO DO ALVO (Acha o mais perto, e SÓ DEPOIS checa a parede)
 local function GetClosestPlayer(fovOverride)
     local mouse      = UserInputService:GetMouseLocation()
     local camPos     = Camera.CFrame.Position
     local currentFov = fovOverride or Config.Aimbot.FOV
     local best, bestDist = nil, currentFov
 
+    -- Passo 1: Achar o inimigo mais próximo do mouse
     for char, data in pairs(CachedPlayers) do
         local plr = data.Player
         if Config.ESP.TeamCheck and plr.Team == LocalPlayer.Team then continue end
 
         local part = char:FindFirstChild(Config.Aimbot.TargetPart) or char:FindFirstChild("HumanoidRootPart")
         if part then
-            if Config.Aimbot.WallCheck then
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {LocalPlayer.Character}
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                local result = Workspace:Raycast(camPos, part.Position - camPos, params)
-                if result and result.Instance and not result.Instance:IsDescendantOf(char) then
-                    continue
-                end
-            end
-
             local sp = Camera:WorldToViewportPoint(part.Position)
             if sp.Z > 0 then
                 local d = (Vector2.new(sp.X, sp.Y) - mouse).Magnitude
@@ -162,10 +148,24 @@ local function GetClosestPlayer(fovOverride)
             end
         end
     end
+
+    -- Passo 2: Se WallCheck estiver ligado, checa APENAS no melhor alvo
+    if best and Config.Aimbot.WallCheck then
+        local params = RaycastParams.new()
+        params.FilterDescendantsInstances = {LocalPlayer.Character}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        local result = Workspace:Raycast(camPos, best.Position - camPos, params)
+        
+        -- Se o Raycast bater em uma parede (e não no alvo), cancela o alvo
+        if result and result.Instance and not result.Instance:IsDescendantOf(best.Parent) then
+            return nil
+        end
+    end
+
     return best
 end
 
--- Atualiza o CurrentTarget 60 vezes por segundo
+-- Atualiza o CurrentTarget
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot.Enabled then
         CurrentTarget = GetClosestPlayer()
@@ -174,7 +174,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP (mantido igual)
+-- ESP (Mantido)
 local function UpdateESP()
     if not Config.ESP.Enabled then
         for _, obj in pairs(espObjects) do for _, d in pairs(obj) do d.Visible = false end end
@@ -259,9 +259,7 @@ local function UpdateESP()
     end
 end
 
--- ============================================================
--- HOOKS DE SILENT AIM (AGORA COM BALÍSTICA)
--- ============================================================
+-- HOOKS
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, key)
     if self == Mouse and (key == "Hit" or key == "Target") then
@@ -274,7 +272,6 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
         end
     end
     
-    -- No Spread residual (não deve ser necessário, mas mantém como fallback)
     if Config.Util.NoSpread and self == Camera and key == "ScreenPointToRay" then
         return function(_, x, y, depth)
             local vp = Camera.ViewportSize
@@ -285,9 +282,7 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
     return oldIndex(self, key)
 end)
 
--- ============================================================
 -- TRIGGERBOT
--- ============================================================
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
