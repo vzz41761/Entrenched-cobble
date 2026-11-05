@@ -1,4 +1,4 @@
--- cobble hills logic (ENTRENCHED PRO V5 — Hybrid)
+-- cobble hills logic (ENTRENCHED PRO V6 - Anti-Crash)
 pcall(function() if setthreadidentity then setthreadidentity(8) end end)
 
 local Players        = game:GetService("Players")
@@ -15,7 +15,7 @@ getgenv().CobbleConfig = {
     ESP      = { Enabled = true,  Box = true, Name = true, Dist = true, Health = true, Tracer = true, TeamCheck = true },
     Aimbot   = { Enabled = true,  Silent = true, HoldMode = true, Key = Enum.UserInputType.MouseButton2,
                  FOV = 150, Smoothness = 0.3, TargetPart = "Head", WallCheck = true, Prediction = 0.165 },
-    Triggerbot = { Enabled = false, Delay = 0.05, FOV = 10 },
+    Triggerbot = { Enabled = false, Delay = 0.01, FOV = 10 },
     Hitbox   = { Enabled = false, Size = 6, Transparency = 0.5 },
     Util     = { Fullbright = false, NoSpread = true }
 }
@@ -24,6 +24,9 @@ local Config        = getgenv().CobbleConfig
 local CachedPlayers = {}
 local espObjects    = {}
 local fovCircle     = Drawing.new("Circle")
+
+-- VARIÁVEL DE CONTROLE ANTI-CRASH (Impede loop infinito no Raycast)
+local isCheckingWall = false 
 
 fovCircle.Thickness = 1.5
 fovCircle.NumSides  = 60
@@ -46,18 +49,20 @@ task.spawn(function()
     end
 end)
 
--- HITBOX EXPANDER (Frame a Frame para forçar contra o anti-cheat)
-RunService.Stepped:Connect(function()
-    if not Config.Hitbox.Enabled then return end
-    for char, data in pairs(CachedPlayers) do
-        if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
-        local targetSize = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
-        for _, partName in ipairs({"HumanoidRootPart", "Head"}) do
-            local part = char:FindFirstChild(partName)
-            if part and part.Size ~= targetSize then
-                part.Size         = targetSize
-                part.Transparency = Config.Hitbox.Transparency
-                part.CanCollide   = false
+-- HITBOX EXPANDER (Otimizado com task.wait em vez de Stepped 60fps)
+task.spawn(function()
+    while task.wait(0.1) do
+        if not Config.Hitbox.Enabled then continue end
+        for char, data in pairs(CachedPlayers) do
+            if Config.ESP.TeamCheck and data.Player.Team == LocalPlayer.Team then continue end
+            local targetSize = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
+            for _, partName in ipairs({"HumanoidRootPart", "Head"}) do
+                local part = char:FindFirstChild(partName)
+                if part and part.Size ~= targetSize then
+                    part.Size         = targetSize
+                    part.Transparency = Config.Hitbox.Transparency
+                    part.CanCollide   = false
+                end
             end
         end
     end
@@ -165,7 +170,12 @@ local function GetClosestPlayer(fovOverride)
                 local params = RaycastParams.new()
                 params.FilterDescendantsInstances = {LocalPlayer.Character}
                 params.FilterType = Enum.RaycastFilterType.Exclude
+                
+                -- TRAVA DE SEGURANÇA: Ativa a flag antes de fazer o Raycast
+                isCheckingWall = true
                 local result = Workspace:Raycast(camPos, part.Position - camPos, params)
+                isCheckingWall = false -- Desativa logo depois
+
                 if result and result.Instance and not result.Instance:IsDescendantOf(char) then
                     continue
                 end
@@ -199,11 +209,13 @@ oldIndex = hookmetamethod(game, "__index", function(self, key)
     return oldIndex(self, key)
 end)
 
--- NO SPREAD (Hook Namecall)
+-- NO SPREAD (Hook Namecall com trava de segurança)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    if Config.Util.NoSpread and (method == "Raycast" or method == "FindPartOnRay") then
+    
+    -- A flag isCheckingWall impede que o WallCheck ative o NoSpread e crie loop infinito
+    if Config.Util.NoSpread and not isCheckingWall and (method == "Raycast" or method == "FindPartOnRay") then
         local args = {...}
         if method == "Raycast" then
             local origin, direction, params = args[1], args[2], args[3]
@@ -246,7 +258,7 @@ RunService:BindToRenderStep("CobbleAim", Enum.RenderPriority.Camera.Value + 100,
     end
 end)
 
--- TRIGGERBOT FORÇADO (A prova de falhas)
+-- TRIGGERBOT (Agressivo com Fallbacks)
 task.spawn(function()
     while task.wait(Config.Triggerbot.Delay) do
         if not Config.Triggerbot.Enabled then continue end
@@ -255,9 +267,9 @@ task.spawn(function()
             pcall(function()
                 if mouse1click then
                     mouse1click()
-                elseif VirtualUser then
-                    VirtualUser:CaptureController()
-                    VirtualUser:ClickButton1(Vector2.new(0, 0))
+                elseif game:GetService("VirtualUser") then
+                    game:GetService("VirtualUser"):CaptureController()
+                    game:GetService("VirtualUser"):ClickButton1(Vector2.new(0, 0))
                 else
                     local vim = game:GetService("VirtualInputManager")
                     vim:SendMouseButtonEvent(0, 0, 0, true,  game, 1)
