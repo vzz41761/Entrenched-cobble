@@ -1,4 +1,4 @@
--- cobble hills UI (ENTRENCHED PRO V2)
+-- cobble hills UI (ENTRENCHED PRO V3)
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Config = getgenv().CobbleConfig
