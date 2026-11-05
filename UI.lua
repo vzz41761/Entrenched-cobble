@@ -1,7 +1,10 @@
--- cobble hills UI (MASTERPIECE EDITION)
+-- cobble hills UI (ENTRENCHED V14 - SYNCED)
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
-local Config           = getgenv().Cobble.Config
+
+-- GARANTE QUE A TABELA EXISTE ANTES DE LER
+if not getgenv().Cobble then getgenv().Cobble = { Config = {} } end
+local Config = getgenv().Cobble.Config
 
 local Theme = {
     Bg      = Color3.fromRGB(16, 18, 25),
@@ -24,7 +27,6 @@ Gui.IgnoreGuiInset = true
 local ok, hui = pcall(function() return gethui and gethui() end)
 Gui.Parent = (ok and hui) or game:GetService("CoreGui")
 
--- Main Frame
 local Main = Instance.new("Frame")
 Main.Size = UDim2.fromOffset(540, 460)
 Main.Position = UDim2.new(0.5, -270, 0.5, -230)
@@ -32,6 +34,7 @@ Main.BackgroundColor3 = Theme.Bg
 Main.BorderSizePixel = 0
 Main.Parent = Gui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+
 local shadow = Instance.new("ImageLabel")
 shadow.Size = UDim2.new(1, 40, 1, 40)
 shadow.Position = UDim2.new(0, -20, 0, -20)
@@ -43,7 +46,6 @@ shadow.ScaleType = Enum.ScaleType.Slice
 shadow.SliceCenter = Rect.new(10, 10, 118, 118)
 shadow.Parent = Main
 
--- Header (Título)
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 50)
 TitleBar.BackgroundTransparency = 1
@@ -61,7 +63,6 @@ TitleText.TextSize = 18
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = TitleBar
 
--- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 140, 1, -70)
 Sidebar.Position = UDim2.new(0, 15, 0, 55)
@@ -76,7 +77,6 @@ TabContainer.BackgroundTransparency = 1
 TabContainer.Parent = Sidebar
 Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 8)
 
--- Content
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, -170, 1, -70)
 Content.Position = UDim2.new(0, 165, 0, 55)
@@ -99,7 +99,6 @@ ScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Scroll.CanvasSize = UDim2.new(0, 0, 0, ScrollLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- Elements Functions
 local function CreateTab(text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 36)
@@ -232,28 +231,6 @@ local function CreateSlider(text, min, max, get, set)
     Refresh()
 end
 
-local function CreateSelector(text, options, get, set)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 36)
-    btn.BackgroundColor3 = Theme.Surface
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextColor3 = Theme.Text
-    btn.TextSize = 13
-    btn.Text = text .. ": " .. tostring(get())
-    btn.AutoButtonColor = false
-    btn.Parent = Scroll
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
-    local idx = 1
-    for i, v in ipairs(options) do if v == get() then idx = i; break end end
-
-    btn.MouseButton1Click:Connect(function()
-        idx = idx % #options + 1
-        set(options[idx])
-        btn.Text = text .. ": " .. tostring(get())
-    end)
-end
-
 local function CreateButton(text, color, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 36)
@@ -268,12 +245,7 @@ local function CreateButton(text, color, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Tabs Logic
-local Tabs = {
-    Visuals = CreateTab("Visuals"),
-    Combat  = CreateTab("Combat"),
-    Utils   = CreateTab("Utils")
-}
+local Tabs = { Visuals = CreateTab("Visuals"), Combat = CreateTab("Combat"), Utils = CreateTab("Utils") }
 
 local function LoadTab(tabName)
     for _, v in ipairs(Scroll:GetChildren()) do
@@ -286,31 +258,24 @@ local function LoadTab(tabName)
     if tabName == "Visuals" then
         CreateToggle("ESP Enabled", function() return Config.ESP.Enabled end, function(v) Config.ESP.Enabled = v end)
         CreateToggle("Box 2D", function() return Config.ESP.Box end, function(v) Config.ESP.Box = v end)
-        CreateToggle("Chams 3D (Highlight)", function() return Config.ESP.Chams end, function(v) Config.ESP.Chams = v end)
+        CreateToggle("Chams 3D", function() return Config.ESP.Chams end, function(v) Config.ESP.Chams = v end)
         CreateToggle("Name", function() return Config.ESP.Name end, function(v) Config.ESP.Name = v end)
         CreateToggle("Distance", function() return Config.ESP.Dist end, function(v) Config.ESP.Dist = v end)
         CreateToggle("Health Bar", function() return Config.ESP.Health end, function(v) Config.ESP.Health = v end)
         CreateToggle("Tracer", function() return Config.ESP.Tracer end, function(v) Config.ESP.Tracer = v end)
         CreateToggle("Team Check", function() return Config.ESP.TeamCheck end, function(v) Config.ESP.TeamCheck = v end)
-
     elseif tabName == "Combat" then
         CreateToggle("Aimbot Enabled", function() return Config.Aimbot.Enabled end, function(v) Config.Aimbot.Enabled = v end)
         CreateToggle("Silent Aim", function() return Config.Aimbot.Silent end, function(v) Config.Aimbot.Silent = v end)
-        CreateToggle("Hold Mode (RMB)", function() return Config.Aimbot.HoldMode end, function(v) Config.Aimbot.HoldMode = v end)
-        CreateToggle("Wall Check", function() return Config.Aimbot.WallCheck end, function(v) Config.Aimbot.WallCheck = v end)
-        CreateSelector("Target Bone", {"Head", "Torso", "HumanoidRootPart"}, function() return Config.Aimbot.TargetPart end, function(v) Config.Aimbot.TargetPart = v end)
-        CreateSlider("FOV", 20, 300, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
-        CreateSlider("Smoothness", 0.05, 1, function() return Config.Aimbot.Smoothness end, function(v) Config.Aimbot.Smoothness = v end)
-        CreateSlider("Prediction", 0, 0.5, function() return Config.Aimbot.Prediction end, function(v) Config.Aimbot.Prediction = v end)
+        CreateSlider("FOV", 20, 360, function() return Config.Aimbot.FOV end, function(v) Config.Aimbot.FOV = v end)
+        
         CreateToggle("Triggerbot (Auto-Fire)", function() return Config.Triggerbot.Enabled end, function(v) Config.Triggerbot.Enabled = v end)
         CreateSlider("Trigger FOV", 2, 30, function() return Config.Triggerbot.FOV end, function(v) Config.Triggerbot.FOV = v end)
-
     elseif tabName == "Utils" then
         CreateToggle("No Spread", function() return Config.Util.NoSpread end, function(v) Config.Util.NoSpread = v end)
         CreateToggle("No Recoil", function() return Config.Util.NoRecoil end, function(v) Config.Util.NoRecoil = v end)
         CreateToggle("Fullbright", function() return Config.Util.Fullbright end, function(v) Config.Util.Fullbright = v end)
         CreateToggle("Custom Crosshair", function() return Config.Util.Crosshair end, function(v) Config.Util.Crosshair = v end)
-        
         CreateToggle("FOV Changer", function() return Config.Util.FOVChanger end, function(v) Config.Util.FOVChanger = v end)
         CreateSlider("Camera FOV", 70, 120, function() return Config.Util.FOVValue end, function(v) Config.Util.FOVValue = v end)
 
@@ -326,7 +291,6 @@ Tabs.Combat.MouseButton1Click:Connect(function() LoadTab("Combat") end)
 Tabs.Utils.MouseButton1Click:Connect(function() LoadTab("Utils") end)
 LoadTab("Visuals")
 
--- Window Dragging
 local dragging, dragInput, dragStart, startPos
 TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -342,12 +306,9 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
 
--- Panic Key
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then Gui.Enabled = not Gui.Enabled end
